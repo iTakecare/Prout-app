@@ -9,6 +9,11 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  VPS_HOST: "76.13.0.189"
+  VPS_USER: root
+  DEPLOY_DIR: /opt/ITCmdm/deploy/prout-app
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -19,32 +24,61 @@ jobs:
       - name: Copier les fichiers sur le VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || '22' }}
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
           source: "Dockerfile,docker-compose.yml,.dockerignore,package.json,package-lock.json,server,client"
-          target: ${{ secrets.VPS_DEPLOY_PATH }}/prout-app
+          target: ${{ env.DEPLOY_DIR }}
           overwrite: true
 
       - name: Build et démarrage de la stack
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || '22' }}
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 25m
           script: |
             set -e
-            cd "${{ secrets.VPS_DEPLOY_PATH }}/prout-app"
-            cat > .env <<'ENVEOF'
-            APP_DOMAIN=${{ vars.APP_DOMAIN }}
+            cd "${{ env.DEPLOY_DIR }}"
+
+            # --- Mot de passe PostgreSQL : généré une fois, stable ensuite ---
+            if [ ! -f .postgres_password ]; then
+              (openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | cut -c1-48) > .postgres_password
+            fi
+            PG_PASS="$(cat .postgres_password)"
+
+            # --- Détection automatique de la configuration Traefik du VPS ---
+            TRAEFIK="$(docker ps --format '{{.Names}} {{.Image}}' | awk 'tolower($0) ~ /traefik/ {print $1; exit}')"
+            PROXY_NETWORK=""
+            if [ -n "$TRAEFIK" ]; then
+              PROXY_NETWORK="$(docker inspect "$TRAEFIK" -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | grep -vE '^(bridge|host|none|)$' | head -1)"
+            fi
+            LABELS="$(docker ps -q | xargs -r docker inspect -f '{{json .Config.Labels}}' 2>/dev/null || true)"
+            CERT_RESOLVER="$(printf '%s' "$LABELS" | grep -oE 'tls\.certresolver":"[^"]+' | head -1 | sed 's/.*"//')"
+            HTTPS_ENTRYPOINT="$(printf '%s' "$LABELS" | grep -oE 'routers\.[^"]+\.entrypoints":"[^"]+' | head -1 | sed 's/.*"//')"
+
+            PROXY_NETWORK="${PROXY_NETWORK:-web}"
+            CERT_RESOLVER="${CERT_RESOLVER:-le}"
+            HTTPS_ENTRYPOINT="${HTTPS_ENTRYPOINT:-websecure}"
+            echo "Traefik -> reseau=$PROXY_NETWORK entrypoint=$HTTPS_ENTRYPOINT certresolver=$CERT_RESOLVER"
+
+            # --- Génération du fichier .env ---
+            cat > .env <<ENVEOF
+            APP_DOMAIN=prout-app.vibecodestudio.io
             POSTGRES_USER=prout
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             POSTGRES_DB=prout
-            PROXY_NETWORK=${{ vars.PROXY_NETWORK }}
-            CERT_RESOLVER=${{ vars.CERT_RESOLVER }}
+            POSTGRES_PASSWORD=$PG_PASS
+            PROXY_NETWORK=$PROXY_NETWORK
+            CERT_RESOLVER=$CERT_RESOLVER
+            HTTPS_ENTRYPOINT=$HTTPS_ENTRYPOINT
             ENVEOF
             chmod 600 .env
-            docker compose up -d --build
+
+            # --- Build et démarrage ---
+            docker compose up -d --build --remove-orphans
             docker image prune -f
+            sleep 5
+            docker compose ps
+            echo "--- Logs application ---"
+            docker compose logs --tail=20 app

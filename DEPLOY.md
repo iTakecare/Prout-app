@@ -1,140 +1,67 @@
 # Déploiement — prout-app.vibecodestudio.io
 
-Ce guide décrit le déploiement de Méthascore sur le VPS iTakecare via le
-workflow GitHub Actions fourni (`.github/workflows/deploy.yml`).
+L'application se déploie **automatiquement** sur le VPS via GitHub Actions.
+Tout est automatisé sauf **une seule chose**, à faire une fois.
 
-## Architecture déployée
+## La seule étape à faire (1 minute)
 
-```
-Internet ──▶ Reverse proxy du VPS (Traefik, TLS Let's Encrypt)
-                      │  Host: prout-app.vibecodestudio.io
-                      ▼
-              conteneur « prout-app »  (Node + client React servi en statique)
-                      │
-                      ▼
-              conteneur « prout-db »   (PostgreSQL 16, volume persistant)
-```
+Le déploiement a besoin du mot de passe du VPS pour s'y connecter. Pour des
+raisons de sécurité, ce mot de passe doit être ajouté dans GitHub (et pas
+dans le code) :
 
-Les deux conteneurs sont décrits dans `docker-compose.yml`. La base de données
-est stockée sur le volume Docker `prout-db-data` (persistant entre les
-redéploiements).
+1. Aller sur le dépôt GitHub → onglet **Settings**
+2. Menu de gauche : **Secrets and variables** → **Actions**
+3. Bouton **New repository secret**
+4. **Name** : `VPS_PASSWORD`
+5. **Secret** : le mot de passe root du VPS
+6. **Add secret**
 
-## 1. Prérequis sur le VPS
+C'est tout. Le reste (adresse du VPS, base de données, certificat HTTPS,
+configuration Traefik) est géré automatiquement.
 
-- **Docker** et le plugin **Docker Compose v2** installés.
-- Un **reverse proxy** (Traefik) déjà en service, gérant les autres
-  sous-domaines de `vibecodestudio.io`, attaché à un **réseau Docker externe**.
-- Le nom de ce réseau (souvent `web` ou `proxy`) et celui du **certresolver**
-  Traefik (souvent `le`) — à reporter dans les variables GitHub ci-dessous.
+## Lancer le déploiement
 
-> Si le proxy n'est pas Traefik, voir la section 5.
+- **Automatique** : à chaque push sur la branche `main`.
+- **Manuel** : onglet **Actions** → **Déploiement VPS** → **Run workflow**.
 
-## 2. DNS
+Le workflow copie le projet sur le VPS, détecte la configuration du reverse
+proxy Traefik, construit l'image Docker et démarre l'application avec sa base
+PostgreSQL. Le premier lancement crée la base et un jeu de données de
+démonstration.
 
-Créer un enregistrement **A** :
+## Ce que fait le déploiement automatiquement
 
-```
-prout-app.vibecodestudio.io.   A   76.13.0.189
-```
+- Connexion au VPS `76.13.0.189`, dossier `/opt/ITCmdm/deploy/prout-app`.
+- Génération d'un mot de passe PostgreSQL fort (conservé entre les déploiements).
+- Détection du réseau Docker, de l'entrypoint HTTPS et du certresolver de
+  Traefik en s'alignant sur les applications déjà en place sur le VPS.
+- Build de l'image et démarrage des conteneurs `prout-app` + `prout-db`.
 
-(ou un CNAME vers le domaine déjà utilisé par les autres apps du VPS).
+## Vérification
 
-## 3. Clé SSH de déploiement
+Après un déploiement réussi : <https://prout-app.vibecodestudio.io>
 
-Sur un poste de confiance :
-
-```bash
-ssh-keygen -t ed25519 -f prout_deploy -C "github-actions prout-app"
-```
-
-Ajouter la **clé publique** (`prout_deploy.pub`) sur le VPS :
-
-```bash
-ssh-copy-id -i prout_deploy.pub root@76.13.0.189
-# ou : ajouter son contenu à /root/.ssh/authorized_keys
-```
-
-La **clé privée** (`prout_deploy`) sera mise dans le secret `VPS_SSH_KEY`.
-
-> Recommandé : créer un utilisateur dédié au déploiement plutôt que `root`, et
-> désactiver l'authentification par mot de passe une fois la clé en place.
-
-## 4. Secrets et variables GitHub
-
-Dans le dépôt : **Settings → Secrets and variables → Actions**.
-
-### Secrets (onglet « Secrets »)
-
-| Nom | Valeur |
-|-----|--------|
-| `VPS_HOST` | `76.13.0.189` |
-| `VPS_USERNAME` | `root` (ou l'utilisateur de déploiement) |
-| `VPS_SSH_KEY` | contenu de la clé privée `prout_deploy` |
-| `VPS_PORT` | `22` (optionnel) |
-| `VPS_DEPLOY_PATH` | `/opt/ITCmdm/deploy` |
-| `POSTGRES_PASSWORD` | un mot de passe fort généré pour la base |
-
-### Variables (onglet « Variables »)
-
-| Nom | Valeur |
-|-----|--------|
-| `APP_DOMAIN` | `prout-app.vibecodestudio.io` |
-| `PROXY_NETWORK` | nom du réseau Docker externe du proxy (ex. `web`) |
-| `CERT_RESOLVER` | nom du certresolver Traefik (ex. `le`) |
-
-## 5. Lancer le déploiement
-
-Le workflow se déclenche :
-
-- **manuellement** : onglet **Actions → Déploiement VPS → Run workflow** ;
-- **automatiquement** : à chaque push sur la branche `main`.
-
-Le workflow copie le projet dans `<VPS_DEPLOY_PATH>/prout-app`, génère le
-fichier `.env`, puis exécute `docker compose up -d --build`. Le premier
-lancement crée le schéma PostgreSQL et un jeu de données de démonstration.
-
-Vérification après déploiement :
-
-```bash
-ssh root@76.13.0.189 'cd /opt/ITCmdm/deploy/prout-app && docker compose ps'
-curl -I https://prout-app.vibecodestudio.io
-```
-
-## 6. Si le reverse proxy n'est pas Traefik
-
-Le `docker-compose.yml` utilise des labels Traefik. Adaptations possibles :
-
-- **nginx-proxy / acme-companion** : remplacer les `labels` par les variables
-  d'environnement `VIRTUAL_HOST`, `VIRTUAL_PORT=4000`, `LETSENCRYPT_HOST` et
-  `LETSENCRYPT_EMAIL`, et garder l'app sur le réseau du proxy.
-- **Nginx/Caddy manuel** : décommenter le bloc `ports: ["4000:4000"]` dans
-  `docker-compose.yml`, retirer le réseau `proxy`, puis configurer un vhost qui
-  reverse-proxie `prout-app.vibecodestudio.io` vers `127.0.0.1:4000`.
-
-## 7. Maintenance
+Sur le VPS, pour diagnostiquer :
 
 ```bash
 cd /opt/ITCmdm/deploy/prout-app
-
-# Logs
-docker compose logs -f app
-
-# Sauvegarde de la base
-docker compose exec db pg_dump -U prout prout > sauvegarde-$(date +%F).sql
-
-# Restauration
-cat sauvegarde.sql | docker compose exec -T db psql -U prout prout
-
-# Mise à jour manuelle
-docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50 app
 ```
 
-## Déploiement manuel (sans GitHub Actions)
+## Sauvegarde de la base
 
 ```bash
-ssh root@76.13.0.189
-mkdir -p /opt/ITCmdm/deploy/prout-app && cd $_
-git clone <url-du-dépôt> .
-cp .env.example .env && nano .env      # renseigner les valeurs
-docker compose up -d --build
+cd /opt/ITCmdm/deploy/prout-app
+docker compose exec db pg_dump -U prout prout > sauvegarde-$(date +%F).sql
 ```
+
+## Sécurité — à faire après le premier déploiement
+
+Le mot de passe root a transité par un canal non sécurisé. Il est recommandé :
+
+1. de **changer le mot de passe root** du VPS, puis de mettre à jour le secret
+   `VPS_PASSWORD` ;
+2. à terme, de passer à une **authentification par clé SSH** (le workflow
+   accepte aussi une clé : remplacer `password:` par `key:` dans
+   `.github/workflows/deploy.yml` et créer le secret `VPS_SSH_KEY`).
