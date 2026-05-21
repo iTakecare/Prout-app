@@ -1,0 +1,50 @@
+name: Déploiement VPS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copier les fichiers sur le VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          source: "Dockerfile,docker-compose.yml,.dockerignore,package.json,package-lock.json,server,client"
+          target: ${{ secrets.VPS_DEPLOY_PATH }}/prout-app
+          overwrite: true
+
+      - name: Build et démarrage de la stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          script: |
+            set -e
+            cd "${{ secrets.VPS_DEPLOY_PATH }}/prout-app"
+            cat > .env <<'ENVEOF'
+            APP_DOMAIN=${{ vars.APP_DOMAIN }}
+            POSTGRES_USER=prout
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=prout
+            PROXY_NETWORK=${{ vars.PROXY_NETWORK }}
+            CERT_RESOLVER=${{ vars.CERT_RESOLVER }}
+            ENVEOF
+            chmod 600 .env
+            docker compose up -d --build
+            docker image prune -f

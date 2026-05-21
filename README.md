@@ -30,28 +30,38 @@ gestion après-vente.
 |--------|-------------|
 | Frontend | React 18 + Vite + TypeScript + React Router |
 | Backend | Node + Express + TypeScript |
-| Base de données | SQLite (`better-sqlite3`) — fichier `server/data/crm.db` |
+| Base de données | PostgreSQL 16 (`pg`) |
+| Déploiement | Docker + Docker Compose, CI/CD GitHub Actions |
 
-> SQLite est une base de données SQL réelle, sans serveur à administrer. Le
-> schéma et les requêtes restent standard : un passage à PostgreSQL ne demande
-> que de remplacer la couche d'accès `server/src/db.ts`.
+## Démarrage en local
 
-## Démarrage
+Une base PostgreSQL est nécessaire. Le plus simple, via Docker :
 
 ```bash
-npm install        # installe server + client (workspaces)
-npm run dev        # lance l'API (port 4000) et le client (port 5173)
+cp .env.example .env          # renseigner POSTGRES_PASSWORD
+docker compose up -d db       # démarre PostgreSQL sur le port 5432
+npm install                   # installe server + client (workspaces)
+npm run dev                    # API (port 4000) + client (port 5173)
 ```
 
-Puis ouvrir http://localhost:5173. La base est créée et alimentée avec un jeu
+Puis ouvrir http://localhost:5173. Le schéma est créé et alimenté avec un jeu
 de données de démonstration au premier lancement.
 
-### Production
+> Le serveur lit `DATABASE_URL` (défaut :
+> `postgres://prout:prout@localhost:5432/prout`).
+
+### Build de production
 
 ```bash
 npm run build      # build du client + compilation du serveur
 npm start          # le serveur sert l'API et le front sur le port 4000
 ```
+
+### Déploiement sur le VPS
+
+L'application se déploie sur `prout-app.vibecodestudio.io` via le workflow
+GitHub Actions. Voir **[DEPLOY.md](./DEPLOY.md)** pour la procédure complète
+(secrets GitHub, DNS, reverse proxy).
 
 ## API principale
 

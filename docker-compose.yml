@@ -1,0 +1,58 @@
+name: prout-app
+
+services:
+  app:
+    build: .
+    image: prout-app:latest
+    container_name: prout-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-prout}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-prout}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy
+    # Sans reverse proxy, décommentez pour exposer l'app directement :
+    # ports:
+    #   - "4000:4000"
+    labels:
+      # Routage du sous-domaine via un reverse proxy Traefik existant sur le VPS.
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK:-web}"
+      - "traefik.http.routers.prout-app.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.prout-app.entrypoints=websecure"
+      - "traefik.http.routers.prout-app.tls=true"
+      - "traefik.http.routers.prout-app.tls.certresolver=${CERT_RESOLVER:-le}"
+      - "traefik.http.services.prout-app.loadbalancer.server.port=4000"
+
+  db:
+    image: postgres:16-alpine
+    container_name: prout-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-prout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-prout}
+    volumes:
+      - prout-db-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-prout} -d ${POSTGRES_DB:-prout}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  internal:
+  # Réseau partagé avec le reverse proxy du VPS (doit déjà exister).
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-web}
+
+volumes:
+  prout-db-data:

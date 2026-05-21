@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import api from "./routes.js";
+import { initDb } from "./db.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -22,6 +23,14 @@ if (fs.existsSync(clientDist)) {
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
 }
 
-app.listen(PORT, () => {
-  console.log(`Méthascore API à l'écoute sur http://localhost:${PORT}`);
+async function start(): Promise<void> {
+  await initDb();
+  app.listen(PORT, () => {
+    console.log(`Méthascore API à l'écoute sur http://localhost:${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("Échec du démarrage du serveur :", err);
+  process.exit(1);
 });
