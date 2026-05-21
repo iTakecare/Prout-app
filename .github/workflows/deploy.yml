@@ -44,22 +44,25 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 15m
+          command_timeout: 16m
           script: |
-            set -e
-            cd "${{ env.DEPLOY_DIR }}"
+            set -x
+            cd "${{ env.DEPLOY_DIR }}" || exit 1
 
-            echo "Chargement de l'image Docker..."
-            docker load -i prout-app-image.tar.gz
+            echo "=== Etat du VPS ==="
+            df -h / || true
+            free -h || true
+            docker system df || true
+
+            echo "=== Nettoyage de l'espace Docker ==="
+            timeout 180 docker image prune -f || true
+            timeout 180 docker builder prune -af || true
+
+            echo "=== Chargement de l'image (limite 8 min) ==="
+            timeout 480 docker load -i prout-app-image.tar.gz || { echo "ECHEC: docker load trop lent ou bloque"; exit 1; }
             rm -f prout-app-image.tar.gz
 
-            # Mot de passe PostgreSQL : généré une fois, stable ensuite.
-            if [ ! -f .postgres_password ]; then
-              (openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | cut -c1-48) > .postgres_password
-            fi
-            PG_PASS="$(cat .postgres_password)"
-
-            # Détection automatique de la configuration Traefik du VPS.
+            echo "=== Detection de la configuration Traefik ==="
             TRAEFIK="$(docker ps --format '{{.Names}} {{.Image}}' | awk 'tolower($0) ~ /traefik/ {print $1; exit}')"
             PROXY_NETWORK=""
             if [ -n "$TRAEFIK" ]; then
@@ -73,6 +76,11 @@ jobs:
             HTTPS_ENTRYPOINT="${HTTPS_ENTRYPOINT:-websecure}"
             echo "Traefik -> reseau=$PROXY_NETWORK entrypoint=$HTTPS_ENTRYPOINT certresolver=$CERT_RESOLVER"
 
+            if [ ! -f .postgres_password ]; then
+              (openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | cut -c1-48) > .postgres_password
+            fi
+            PG_PASS="$(cat .postgres_password)"
+
             cat > .env <<ENVEOF
             APP_DOMAIN=prout-app.vibecodestudio.io
             POSTGRES_USER=prout
@@ -84,10 +92,29 @@ jobs:
             ENVEOF
             chmod 600 .env
 
-            docker compose up -d --no-build --remove-orphans
-            docker image prune -f
-            sleep 5
-            echo "--- État des conteneurs ---"
-            docker compose ps
-            echo "--- Logs application ---"
-            docker compose logs --tail=25 app
+            echo "=== Demarrage des conteneurs (limite 5 min) ==="
+            timeout 300 docker compose up -d --no-build --remove-orphans || { echo "ECHEC: docker compose up trop lent ou bloque"; exit 1; }
+            echo "=== Deploiement termine ==="
+
+      - name: Diagnostic du VPS
+        if: always()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 4m
+          script: |
+            cd "${{ env.DEPLOY_DIR }}" 2>/dev/null || { echo "Dossier de deploiement absent"; exit 0; }
+            echo "===== Espace disque ====="
+            df -h /
+            echo "===== Conteneurs ====="
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | head -40
+            echo "===== Reseaux Docker ====="
+            docker network ls
+            echo "===== Etat de la stack prout-app ====="
+            docker compose ps 2>/dev/null || echo "(stack non demarree)"
+            echo "===== Logs application (50 dernieres lignes) ====="
+            docker compose logs --tail=50 app 2>/dev/null || echo "(pas de logs)"
+            echo "===== Logs base de donnees (20 dernieres lignes) ====="
+            docker compose logs --tail=20 db 2>/dev/null || echo "(pas de logs)"
