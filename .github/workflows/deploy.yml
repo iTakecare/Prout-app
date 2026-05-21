@@ -21,34 +21,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copier les fichiers sur le VPS
+      # L'image est construite ici, sur l'infrastructure GitHub (rapide),
+      # et non sur le VPS — qui n'a qu'à la charger et la démarrer.
+      - name: Build de l'image Docker
+        run: docker build -t prout-app:latest .
+
+      - name: Export de l'image
+        run: docker save prout-app:latest | gzip > prout-app-image.tar.gz
+
+      - name: Copier l'image et la configuration sur le VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: "Dockerfile,docker-compose.yml,.dockerignore,package.json,package-lock.json,server,client"
+          source: "prout-app-image.tar.gz,docker-compose.yml"
           target: ${{ env.DEPLOY_DIR }}
-          overwrite: true
 
-      - name: Build et démarrage de la stack
+      - name: Chargement et démarrage sur le VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 25m
+          command_timeout: 15m
           script: |
             set -e
             cd "${{ env.DEPLOY_DIR }}"
 
-            # --- Mot de passe PostgreSQL : généré une fois, stable ensuite ---
+            echo "Chargement de l'image Docker..."
+            docker load -i prout-app-image.tar.gz
+            rm -f prout-app-image.tar.gz
+
+            # Mot de passe PostgreSQL : généré une fois, stable ensuite.
             if [ ! -f .postgres_password ]; then
               (openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | cut -c1-48) > .postgres_password
             fi
             PG_PASS="$(cat .postgres_password)"
 
-            # --- Détection automatique de la configuration Traefik du VPS ---
+            # Détection automatique de la configuration Traefik du VPS.
             TRAEFIK="$(docker ps --format '{{.Names}} {{.Image}}' | awk 'tolower($0) ~ /traefik/ {print $1; exit}')"
             PROXY_NETWORK=""
             if [ -n "$TRAEFIK" ]; then
@@ -57,13 +68,11 @@ jobs:
             LABELS="$(docker ps -q | xargs -r docker inspect -f '{{json .Config.Labels}}' 2>/dev/null || true)"
             CERT_RESOLVER="$(printf '%s' "$LABELS" | grep -oE 'tls\.certresolver":"[^"]+' | head -1 | sed 's/.*"//')"
             HTTPS_ENTRYPOINT="$(printf '%s' "$LABELS" | grep -oE 'routers\.[^"]+\.entrypoints":"[^"]+' | head -1 | sed 's/.*"//')"
-
             PROXY_NETWORK="${PROXY_NETWORK:-web}"
             CERT_RESOLVER="${CERT_RESOLVER:-le}"
             HTTPS_ENTRYPOINT="${HTTPS_ENTRYPOINT:-websecure}"
             echo "Traefik -> reseau=$PROXY_NETWORK entrypoint=$HTTPS_ENTRYPOINT certresolver=$CERT_RESOLVER"
 
-            # --- Génération du fichier .env ---
             cat > .env <<ENVEOF
             APP_DOMAIN=prout-app.vibecodestudio.io
             POSTGRES_USER=prout
@@ -75,10 +84,10 @@ jobs:
             ENVEOF
             chmod 600 .env
 
-            # --- Build et démarrage ---
-            docker compose up -d --build --remove-orphans
+            docker compose up -d --no-build --remove-orphans
             docker image prune -f
             sleep 5
+            echo "--- État des conteneurs ---"
             docker compose ps
             echo "--- Logs application ---"
-            docker compose logs --tail=20 app
+            docker compose logs --tail=25 app

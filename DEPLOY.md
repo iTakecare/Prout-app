@@ -31,11 +31,13 @@ démonstration.
 
 ## Ce que fait le déploiement automatiquement
 
+- **Construction de l'image Docker sur l'infrastructure GitHub** (rapide), puis
+  transfert de l'image prête vers le VPS — le VPS ne compile rien lui-même.
 - Connexion au VPS `76.13.0.189`, dossier `/opt/ITCmdm/deploy/prout-app`.
 - Génération d'un mot de passe PostgreSQL fort (conservé entre les déploiements).
 - Détection du réseau Docker, de l'entrypoint HTTPS et du certresolver de
   Traefik en s'alignant sur les applications déjà en place sur le VPS.
-- Build de l'image et démarrage des conteneurs `prout-app` + `prout-db`.
+- Chargement de l'image et démarrage des conteneurs `prout-app` + `prout-db`.
 
 ## Vérification
 
