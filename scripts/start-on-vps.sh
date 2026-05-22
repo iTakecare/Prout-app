@@ -51,6 +51,10 @@ chmod 600 .env
 
 echo
 echo "## Démarrage des conteneurs"
+# Supprime tout conteneur prout-app résiduel (y compris un conteneur
+# temporaire laissé par un déploiement précédent interrompu) pour éviter
+# l'erreur « No such container » lors de la recréation.
+docker ps -aq --filter 'name=prout-app' | xargs -r docker rm -f 2>/dev/null || true
 timeout 420 docker compose up -d --no-build --remove-orphans
 docker compose ps
 
