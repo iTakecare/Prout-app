@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
-import { LogoMark } from "../components/Logo";
+import { LogoFull } from "../components/Logo";
 import { ProbabilityGauge } from "../components/ResultView";
 import { fmtDate, fmtEnergy, fmtEur, fmtInt, fmtNum } from "../format";
 import type { Assessment, Lead } from "../types";
@@ -81,7 +81,7 @@ export default function Proposition() {
                 {lead?.city ? ` · ${lead.city}` : ""}
               </div>
             </div>
-            <LogoMark size={54} />
+            <LogoFull iconSize={48} />
           </div>
         </div>
 

@@ -1,46 +1,46 @@
-/** Marque visuelle Waste-end : une feuille (matière organique) surmontée
- *  d'une bulle de biogaz, évoquant la biométhanisation. */
-export function LogoMark({ size = 38 }: { size?: number }) {
+/** Marque Waste-end : feuille (matière organique) traversée d'un éclair
+ *  (énergie) avec une tige orange — recréée en SVG d'après le logo officiel. */
+const MINT = "#7FC9AF";
+const ORANGE = "#D86E4C";
+
+export function LogoMark({ size = 40 }: { size?: number }) {
   return (
     <svg
-      width={size}
+      width={(size * 120) / 150}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 120 150"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <defs>
-        <linearGradient id="we-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#27b766" />
-          <stop offset="1" stopColor="#117a42" />
-        </linearGradient>
-      </defs>
-      <rect width="48" height="48" rx="13" fill="url(#we-g)" />
       <path
-        d="M24 13c-9 3-13 12-8 21 1 2 3 4 5 5 1-9 5-15 11-19-5 1-9 4-11 9-1-7 1-12 3-16z"
-        fill="#fff"
-        fillOpacity="0.95"
+        d="M60 5C40 29 25 52 26 79c1 32 17 50 34 50s33-18 34-50C95 52 80 29 60 5Z"
+        fill={MINT}
       />
-      <circle cx="32.5" cy="15.5" r="4.2" fill="#fff" fillOpacity="0.55" />
+      <path d="M55 124 L60 149 L65 124 Z" fill={ORANGE} />
+      <path
+        d="M63 36 L38 85 L61 85 L58 118 L84 69 L61 69 Z"
+        fill="#fff"
+      />
     </svg>
   );
 }
 
-/** Logo complet : marque + nom, pour la barre latérale et les documents. */
-export function Logo({ size = 38, dark = false }: { size?: number; dark?: boolean }) {
+/** Logo complet : marque + mot « waste·end ». */
+export function LogoFull({ iconSize = 46 }: { iconSize?: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-      <LogoMark size={size} />
-      <div>
-        <div
-          className="brand-name"
-          style={dark ? { color: "#0e261c" } : undefined}
-        >
-          Waste-end
-        </div>
-        <span className="brand-sub">Méthascore CRM</span>
-      </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <LogoMark size={iconSize} />
+      <span
+        style={{
+          fontWeight: 800,
+          fontSize: iconSize * 0.6,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        <span style={{ color: ORANGE }}>waste</span>
+        <span style={{ color: MINT }}>·end</span>
+      </span>
     </div>
   );
 }

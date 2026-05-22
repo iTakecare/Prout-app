@@ -1,17 +1,19 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Pipeline from "./pages/Pipeline";
+import CRM from "./pages/CRM";
 import LeadDetailPage from "./pages/LeadDetail";
 import Calculator from "./pages/Calculator";
 import Substrates from "./pages/Substrates";
 import Proposition from "./pages/Proposition";
-import { Logo } from "./components/Logo";
+import { LogoMark } from "./components/Logo";
 
 const ICONS: Record<string, JSX.Element> = {
-  dashboard: (
-    <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 11h8v10h-8zM3 13h8v8H3z" />
-  ),
+  dashboard: <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 11h8v10h-8zM3 13h8v8H3z" />,
   pipeline: <path d="M3 4h5v16H3zM10 4h5v11h-5zM17 4h4v7h-4z" />,
+  crm: (
+    <path d="M9 11a3 3 0 100-6 3 3 0 000 6M3.5 20c0-3.3 2.5-5 5.5-5s5.5 1.7 5.5 5M17 12.5a2.6 2.6 0 100-5M20.5 20c0-2.6-1.3-4-3.5-4.6" />
+  ),
   calc: (
     <path d="M5 3h14v18H5zM8.5 7.5h7M8.5 12h1M12 12h0M14.5 12h1M8.5 16h1M12 16h0M14.5 16h1" />
   ),
@@ -21,6 +23,7 @@ const ICONS: Record<string, JSX.Element> = {
 const NAV = [
   { to: "/", label: "Tableau de bord", icon: "dashboard", end: true },
   { to: "/pipeline", label: "Pipeline commercial", icon: "pipeline", end: false },
+  { to: "/crm", label: "CRM — Clients", icon: "crm", end: false },
   { to: "/calculateur", label: "Calculateur", icon: "calc", end: false },
   { to: "/substrats", label: "Référentiel déchets", icon: "leaf", end: false },
 ];
@@ -30,7 +33,11 @@ function MainLayout() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          <Logo />
+          <LogoMark size={38} />
+          <div>
+            <div className="brand-name">Méthascore</div>
+            <span className="brand-sub">Waste-end CRM</span>
+          </div>
         </div>
         {NAV.map((n) => (
           <NavLink
@@ -61,6 +68,7 @@ function MainLayout() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/crm" element={<CRM />} />
           <Route path="/leads/:id" element={<LeadDetailPage />} />
           <Route path="/calculateur" element={<Calculator />} />
           <Route path="/substrats" element={<Substrates />} />
