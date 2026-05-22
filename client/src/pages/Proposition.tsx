@@ -21,6 +21,108 @@ const SUPPORT_ARGS = [
   "Cadre réglementaire favorable : le tri à la source des biodéchets est encouragé et progressivement rendu obligatoire.",
 ];
 
+const TEAM = [
+  {
+    name: "Lola Brousmiche",
+    role: "Co-fondatrice · Ingénieure chimiste",
+    photo: "/team/lola.jpg",
+    bio: "Lors de sa formation d'ingénieur en chimie, Lola s'est spécialisée dans la biométhanisation des déchets alimentaires lors de son stage et de son travail de fin d'étude. Elle a ensuite approfondi sa connaissance du sujet pendant deux ans au sein de ValBiom asbl, experts en valorisation de la biomasse en Wallonie. Co-fondatrice de Waste-end et Circular Economy Optimist, elle dimensionne au mieux l'installation qui vous convient grâce à ses compétences techniques.",
+  },
+  {
+    name: "Régis Coli",
+    role: "Chief Technology Officer",
+    photo: "/team/regis.jpg",
+    bio: "Fort d'une expérience riche et de compétences techniques pointues, Régis a rejoint Waste-end comme Chief Technology Officer. Curieux, visionnaire et animé par la volonté de trouver des solutions concrètes, il apporte un regard neuf, transforme les défis en opportunités et fait avancer Waste-end vers un futur toujours plus circulaire.",
+  },
+];
+
+const SUPPORTERS = [
+  "Ceneo — une énergie commune",
+  "YEP Tech — Polytech Mons",
+  "Charleroi Entreprendre",
+  "Fondation pour les Générations Futures",
+  "Ignity — Start to Scale",
+  "Resto du Cœur",
+  "KAYA — Belgian Coalition of Ecopreneurs",
+  "Lauréat Réseau Entreprendre Wallonie",
+  "VLAIO",
+  "Wallonie Entreprendre",
+  "POM Oost-Vlaanderen",
+  "POM West-Vlaanderen",
+  "Grand Est Développement",
+];
+
+const COFINANCERS = [
+  "Union européenne",
+  "Interreg France-Wallonie-Vlaanderen",
+  "Région Grand Est",
+  "Province d'Oost-Vlaanderen",
+  "Région Hauts-de-France",
+  "Wallonie",
+  "Province de West-Vlaanderen",
+];
+
+const AWARDS = [
+  "Gagnant Inno Pépites Award 2018 — catégorie jeunes entreprises",
+  "Gagnant Interreg Protopitch, Boostcamp 2018 — Prix Securex",
+  "Lauréat Mind & Market 2019 — Prix de la catégorie lancement",
+  "Lauréat Mind & Market 2019 — Prix du jury",
+  "Fondation pour les Générations Futures 2020 — Bourse de prototypage",
+  "Fondation pour les Générations Futures 2023 — Lauréat du Fonds SE'nSE",
+  "Ceneo — Lauréat du prix Ineo 2023",
+  "Lauréat du Starter Fund 2025",
+  "Lauréat du Réseau Entreprendre Wallonie",
+];
+
+function Avatar({ src, name }: { src: string; name: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    const initials = name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2);
+    return <div className="team-photo team-photo-fallback">{initials}</div>;
+  }
+  return (
+    <img
+      className="team-photo"
+      src={src}
+      alt={name}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+function Supporters() {
+  const [broken, setBroken] = useState(false);
+  if (!broken) {
+    return (
+      <img
+        className="doc-supporters-img"
+        src="/supporters.png"
+        alt="Partenaires et soutiens de Waste-end"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <>
+      <div className="supporter-chips">
+        {SUPPORTERS.map((s) => (
+          <span key={s}>{s}</span>
+        ))}
+      </div>
+      <div className="cofin-label">Co-financeurs</div>
+      <div className="supporter-chips">
+        {COFINANCERS.map((s) => (
+          <span key={s}>{s}</span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function Proposition() {
   const { assessmentId } = useParams();
   const [data, setData] = useState<(Assessment & { lead: Lead | null }) | null>(null);
@@ -185,6 +287,36 @@ export default function Proposition() {
               valorisée — pour {fmtInt(r.totalTonnage)} t de déchets et un
               potentiel méthanogène moyen de {fmtNum(r.avgBmp, 0)} m³ CH₄/t MO.
             </p>
+          </div>
+
+          <div className="doc-section">
+            <h2>Notre équipe</h2>
+            <div className="doc-team">
+              {TEAM.map((m) => (
+                <div className="team-member" key={m.name}>
+                  <Avatar src={m.photo} name={m.name} />
+                  <div>
+                    <div className="t-name">{m.name}</div>
+                    <div className="t-role">{m.role}</div>
+                    <div className="t-bio">{m.bio}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="doc-section">
+            <h2>Prix &amp; distinctions</h2>
+            <ul className="doc-args">
+              {AWARDS.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="doc-section">
+            <h2>Ils soutiennent le projet</h2>
+            <Supporters />
           </div>
         </div>
 
