@@ -305,6 +305,7 @@ function EtudesTab({
   onChange: (fn: () => Promise<unknown>) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(lead.assessments.length === 0);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   return (
     <div className="stack">
@@ -342,19 +343,56 @@ function EtudesTab({
               </span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <Link className="btn sm" to={`/proposition/${a.id}`} target="_blank">
-                Proposition PDF
-              </Link>
-              <button
-                className="btn danger sm"
-                disabled={busy}
-                onClick={() => onChange(() => api.deleteAssessment(a.id))}
-              >
-                Supprimer
-              </button>
+              {editingId === a.id ? (
+                <button
+                  className="btn ghost sm"
+                  onClick={() => setEditingId(null)}
+                >
+                  Annuler
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn ghost sm"
+                    onClick={() => setEditingId(a.id)}
+                  >
+                    Modifier
+                  </button>
+                  <Link
+                    className="btn sm"
+                    to={`/proposition/${a.id}`}
+                    target="_blank"
+                  >
+                    Proposition PDF
+                  </Link>
+                  <button
+                    className="btn danger sm"
+                    disabled={busy}
+                    onClick={() => onChange(() => api.deleteAssessment(a.id))}
+                  >
+                    Supprimer
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          <ResultView result={a.result} />
+          {editingId === a.id ? (
+            <AssessmentForm
+              key={a.id}
+              substrates={substrates}
+              submitLabel="Enregistrer les modifications"
+              busy={busy}
+              showLabel
+              initial={{ ...a.inputs, label: a.label }}
+              onSubmit={(input) =>
+                onChange(() => api.updateAssessment(a.id, input)).then(() =>
+                  setEditingId(null),
+                )
+              }
+            />
+          ) : (
+            <ResultView result={a.result} />
+          )}
         </div>
       ))}
       {lead.assessments.length === 0 && (

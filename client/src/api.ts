@@ -52,6 +52,11 @@ export const api = {
     }),
   deleteAssessment: (id: number) =>
     request<{ ok: boolean }>(`/api/assessments/${id}`, { method: "DELETE" }),
+  updateAssessment: (id: number, input: AssessmentInput & { label?: string }) =>
+    request<LeadDetail>(`/api/assessments/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
   addActivity: (leadId: number, type: string, summary: string) =>
     request<LeadDetail>(`/api/leads/${leadId}/activities`, {
       method: "POST",

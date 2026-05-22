@@ -386,6 +386,35 @@ router.get(
   }),
 );
 
+router.put(
+  "/assessments/:id",
+  wrap(async (req, res) => {
+    const id = Number(req.params.id);
+    const existing = await pool.query(
+      "SELECT lead_id FROM assessments WHERE id = $1",
+      [id],
+    );
+    if (existing.rowCount === 0)
+      return res.status(404).json({ error: "Étude introuvable" });
+    const ctx = buildContext(req.body ?? {});
+    const lines = buildLines(req.body?.lines);
+    const result = compute(lines, ctx, await getSubstrates());
+    const label = String(req.body?.label || "Étude de faisabilité");
+    await pool.query(
+      `UPDATE assessments SET label = $1, inputs_json = $2, result_json = $3,
+         probability = $4 WHERE id = $5`,
+      [
+        label,
+        JSON.stringify({ ...ctx, lines }),
+        JSON.stringify(result),
+        result.probability,
+        id,
+      ],
+    );
+    res.json(await leadDetail(existing.rows[0].lead_id));
+  }),
+);
+
 router.delete(
   "/assessments/:id",
   wrap(async (req, res) => {
