@@ -2,15 +2,22 @@ name: Déploiement VPS
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   VPS_HOST: "76.13.0.189"
   VPS_USER: root
   DEPLOY_DIR: /opt/ITCmdm/deploy/prout-app
+  SSH_OPTS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30"
 
 jobs:
   deploy:
@@ -19,100 +26,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # L'image est construite ici, sur l'infrastructure GitHub (rapide),
-      # et non sur le VPS — qui n'a qu'à la charger et la démarrer.
+      # L'image est construite ici, sur l'infrastructure GitHub (rapide).
       - name: Build de l'image Docker
         run: docker build -t prout-app:latest .
 
       - name: Export de l'image
         run: docker save prout-app:latest | gzip > prout-app-image.tar.gz
 
-      - name: Copier l'image et la configuration sur le VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "prout-app-image.tar.gz,docker-compose.yml"
-          target: ${{ env.DEPLOY_DIR }}
+      - name: Installer sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
-      - name: Chargement et démarrage sur le VPS
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 16m
-          script: |
-            set -x
-            cd "${{ env.DEPLOY_DIR }}" || exit 1
+      - name: Transfert vers le VPS
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          echo "===== TRANSFERT DES FICHIERS =====" >> vps-report.txt
+          if sshpass -e ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "mkdir -p $DEPLOY_DIR && echo 'Connexion OK'" >> vps-report.txt 2>&1; then
+            sshpass -e scp $SSH_OPTS prout-app-image.tar.gz docker-compose.yml \
+              "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/" >> vps-report.txt 2>&1 \
+              && echo "Transfert de l'image : OK" >> vps-report.txt \
+              || echo "ECHEC: transfert de l'image" >> vps-report.txt
+          else
+            echo "ECHEC: connexion SSH au VPS" >> vps-report.txt
+          fi
 
-            echo "=== Etat du VPS ==="
-            df -h / || true
-            free -h || true
-            docker system df || true
+      - name: Diagnostic et déploiement sur le VPS
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          echo "===== EXÉCUTION DU DÉPLOIEMENT =====" >> vps-report.txt
+          sshpass -e ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" 'bash -s' < scripts/vps-deploy.sh \
+            >> vps-report.txt 2>&1 \
+            || echo "(le script de déploiement s'est terminé en erreur)" >> vps-report.txt
+          echo "----- RAPPORT COMPLET -----"
+          cat vps-report.txt
 
-            echo "=== Nettoyage de l'espace Docker ==="
-            timeout 180 docker image prune -f || true
-            timeout 180 docker builder prune -af || true
-
-            echo "=== Chargement de l'image (limite 8 min) ==="
-            timeout 480 docker load -i prout-app-image.tar.gz || { echo "ECHEC: docker load trop lent ou bloque"; exit 1; }
-            rm -f prout-app-image.tar.gz
-
-            echo "=== Detection de la configuration Traefik ==="
-            TRAEFIK="$(docker ps --format '{{.Names}} {{.Image}}' | awk 'tolower($0) ~ /traefik/ {print $1; exit}')"
-            PROXY_NETWORK=""
-            if [ -n "$TRAEFIK" ]; then
-              PROXY_NETWORK="$(docker inspect "$TRAEFIK" -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | grep -vE '^(bridge|host|none|)$' | head -1)"
-            fi
-            LABELS="$(docker ps -q | xargs -r docker inspect -f '{{json .Config.Labels}}' 2>/dev/null || true)"
-            CERT_RESOLVER="$(printf '%s' "$LABELS" | grep -oE 'tls\.certresolver":"[^"]+' | head -1 | sed 's/.*"//')"
-            HTTPS_ENTRYPOINT="$(printf '%s' "$LABELS" | grep -oE 'routers\.[^"]+\.entrypoints":"[^"]+' | head -1 | sed 's/.*"//')"
-            PROXY_NETWORK="${PROXY_NETWORK:-web}"
-            CERT_RESOLVER="${CERT_RESOLVER:-le}"
-            HTTPS_ENTRYPOINT="${HTTPS_ENTRYPOINT:-websecure}"
-            echo "Traefik -> reseau=$PROXY_NETWORK entrypoint=$HTTPS_ENTRYPOINT certresolver=$CERT_RESOLVER"
-
-            if [ ! -f .postgres_password ]; then
-              (openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | cut -c1-48) > .postgres_password
-            fi
-            PG_PASS="$(cat .postgres_password)"
-
-            cat > .env <<ENVEOF
-            APP_DOMAIN=prout-app.vibecodestudio.io
-            POSTGRES_USER=prout
-            POSTGRES_DB=prout
-            POSTGRES_PASSWORD=$PG_PASS
-            PROXY_NETWORK=$PROXY_NETWORK
-            CERT_RESOLVER=$CERT_RESOLVER
-            HTTPS_ENTRYPOINT=$HTTPS_ENTRYPOINT
-            ENVEOF
-            chmod 600 .env
-
-            echo "=== Demarrage des conteneurs (limite 5 min) ==="
-            timeout 300 docker compose up -d --no-build --remove-orphans || { echo "ECHEC: docker compose up trop lent ou bloque"; exit 1; }
-            echo "=== Deploiement termine ==="
-
-      - name: Diagnostic du VPS
+      - name: Publier le rapport sur la PR
         if: always()
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 4m
-          script: |
-            cd "${{ env.DEPLOY_DIR }}" 2>/dev/null || { echo "Dossier de deploiement absent"; exit 0; }
-            echo "===== Espace disque ====="
-            df -h /
-            echo "===== Conteneurs ====="
-            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | head -40
-            echo "===== Reseaux Docker ====="
-            docker network ls
-            echo "===== Etat de la stack prout-app ====="
-            docker compose ps 2>/dev/null || echo "(stack non demarree)"
-            echo "===== Logs application (50 dernieres lignes) ====="
-            docker compose logs --tail=50 app 2>/dev/null || echo "(pas de logs)"
-            echo "===== Logs base de donnees (20 dernieres lignes) ====="
-            docker compose logs --tail=20 db 2>/dev/null || echo "(pas de logs)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f vps-report.txt ] || echo "(aucun rapport généré)" > vps-report.txt
+          {
+            echo "## Rapport de déploiement VPS — run ${{ github.run_id }}"
+            echo
+            echo '```'
+            tail -c 60000 vps-report.txt
+            echo '```'
+          } > comment.md
+          gh pr comment 1 --body-file comment.md --repo "${{ github.repository }}" || true
