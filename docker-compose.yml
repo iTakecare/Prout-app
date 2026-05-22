@@ -24,11 +24,11 @@ services:
       # Les valeurs PROXY_NETWORK / HTTPS_ENTRYPOINT / CERT_RESOLVER sont
       # détectées automatiquement lors du déploiement (voir deploy.yml).
       - "traefik.enable=true"
-      - "traefik.docker.network=${PROXY_NETWORK:-web}"
+      - "traefik.docker.network=${PROXY_NETWORK:-deploy_internal}"
       - "traefik.http.routers.prout-app.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.prout-app.entrypoints=${HTTPS_ENTRYPOINT:-websecure}"
       - "traefik.http.routers.prout-app.tls=true"
-      - "traefik.http.routers.prout-app.tls.certresolver=${CERT_RESOLVER:-le}"
+      - "traefik.http.routers.prout-app.tls.certresolver=${CERT_RESOLVER:-letsencrypt}"
       - "traefik.http.services.prout-app.loadbalancer.server.port=4000"
 
   db:
@@ -54,7 +54,7 @@ networks:
   # Réseau partagé avec le reverse proxy du VPS (détecté au déploiement).
   proxy:
     external: true
-    name: ${PROXY_NETWORK:-web}
+    name: ${PROXY_NETWORK:-deploy_internal}
 
 volumes:
   prout-db-data:

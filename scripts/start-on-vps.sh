@@ -22,8 +22,8 @@ fi
 LABELS=$(docker ps -q | xargs -r docker inspect -f '{{json .Config.Labels}}' 2>/dev/null || true)
 CERT_RESOLVER=$(printf '%s' "$LABELS" | grep -oE '"traefik[^"]*certresolver":"[^"]+"' | head -1 | sed -E 's/.*:"([^"]+)"/\1/')
 HTTPS_ENTRYPOINT=$(printf '%s' "$LABELS" | grep -oE '"traefik[^"]*entrypoints":"[^"]+"' | sed -E 's/.*:"([^"]+)"/\1/' | grep -iE 'secure|https|443' | head -1)
-: "${PROXY_NETWORK:=web}"
-: "${CERT_RESOLVER:=le}"
+: "${PROXY_NETWORK:=deploy_internal}"
+: "${CERT_RESOLVER:=letsencrypt}"
 : "${HTTPS_ENTRYPOINT:=websecure}"
 echo "Conteneur Traefik : ${TRAEFIK:-introuvable}"
 echo "Réseau retenu      : $PROXY_NETWORK"
@@ -59,7 +59,14 @@ echo "## Vérification"
 sleep 12
 echo -n "Application (réponse interne) : "
 docker exec prout-app wget -qO- --timeout=10 http://localhost:4000/api/health 2>&1 || echo "(pas de réponse)"
-echo -n "Routage Traefik HTTPS        : "
+echo
+echo -n "Routage Traefik (Host interne) : "
 curl -sk -o /dev/null -w 'HTTP %{http_code}\n' --max-time 20 \
   -H 'Host: prout-app.vibecodestudio.io' https://localhost 2>&1 || echo "(échec)"
+echo "Émission du certificat Let's Encrypt en cours..."
+sleep 30
+curl -sS -o /dev/null \
+  -w 'Certificat HTTPS public : HTTP %{http_code} · validation TLS %{ssl_verify_result} (0 = certificat valide)\n' \
+  --max-time 25 https://prout-app.vibecodestudio.io 2>&1 \
+  || echo "Certificat HTTPS public : pas encore émis — réessayer dans quelques minutes"
 echo "DEPLOIEMENT-OK"
