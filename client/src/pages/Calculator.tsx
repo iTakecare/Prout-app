@@ -139,8 +139,9 @@ export default function Calculator() {
             </div>
           ) : (
             <div className="card empty">
-              Renseignez les déchets alimentaires et lancez le calcul pour
-              afficher la pertinence du projet et les bénéfices estimés.
+              Renseignez les déchets alimentaires et cliquez sur «&nbsp;Calculer
+              le potentiel&nbsp;». Le résultat s'affichera ici, suivi d'un
+              encart pour <strong>rattacher l'étude à un client</strong>.
             </div>
           )}
         </div>
