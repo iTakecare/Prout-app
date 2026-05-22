@@ -60,7 +60,7 @@ jobs:
         run: |
           [ -f deploy-log.txt ] || echo "(déploiement non démarré)" > deploy-log.txt
           {
-            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+            if grep -q "DEPLOIEMENT-OK" deploy-log.txt; then
               echo "## ✅ Déploiement réussi — run ${{ github.run_id }}"
               echo
               echo "Application en ligne : https://prout-app.vibecodestudio.io"
