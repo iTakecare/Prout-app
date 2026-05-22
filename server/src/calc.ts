@@ -1,21 +1,22 @@
 /**
- * Moteur de calcul de méthanisation.
+ * Moteur de calcul de biométhanisation de déchets alimentaires.
  *
- * Estime, à partir d'un gisement de déchets organiques, le potentiel
- * biogaz / biométhane, la valorisation énergétique et économique, ainsi
- * qu'une probabilité de faisabilité du projet de méthanisation.
+ * Estime, pour un établissement (restaurant, école, maison de repos,
+ * hôpital, cuisine de collectivité...), le potentiel d'une unité de
+ * biométhanisation sur site type Waste-end : production de biogaz,
+ * chaleur valorisable, digestat (engrais), CO2 évité par rapport à
+ * l'incinération, économies réalisées, et un score de pertinence du
+ * projet.
  *
- * Les valeurs de référence des substrats (matière sèche, matière organique,
- * potentiel méthanogène) sont des ordres de grandeur issus de la littérature
- * technique (ADEME, guides biogaz). Elles peuvent être affinées par substrat.
+ * Les caractéristiques des déchets (matière sèche, matière organique,
+ * potentiel méthanogène) sont des ordres de grandeur issus de la
+ * littérature technique sur la digestion anaérobie des biodéchets.
  */
 
 export type SubstrateCategory =
-  | "Effluents d'élevage"
-  | "Biodéchets"
-  | "Agro-industrie"
-  | "Cultures & CIVE"
-  | "Boues & co-produits";
+  | "Épluchures & préparation"
+  | "Restes de repas & invendus"
+  | "Sous-produits riches";
 
 export interface Substrate {
   id: string;
@@ -30,26 +31,16 @@ export interface Substrate {
 }
 
 export const SUBSTRATES: Substrate[] = [
-  { id: "lisier-bovin", name: "Lisier bovin", category: "Effluents d'élevage", ts: 0.08, vs: 0.8, bmp: 210 },
-  { id: "fumier-bovin", name: "Fumier bovin", category: "Effluents d'élevage", ts: 0.21, vs: 0.82, bmp: 230 },
-  { id: "lisier-porcin", name: "Lisier porcin", category: "Effluents d'élevage", ts: 0.06, vs: 0.75, bmp: 320 },
-  { id: "fumier-volaille", name: "Fumier de volaille", category: "Effluents d'élevage", ts: 0.35, vs: 0.75, bmp: 280 },
-  { id: "fumier-equin", name: "Fumier équin", category: "Effluents d'élevage", ts: 0.3, vs: 0.8, bmp: 200 },
-  { id: "biodechets-menagers", name: "Biodéchets ménagers", category: "Biodéchets", ts: 0.28, vs: 0.85, bmp: 480 },
-  { id: "dechets-restauration", name: "Déchets de restauration", category: "Biodéchets", ts: 0.22, vs: 0.9, bmp: 550 },
-  { id: "invendus-gms", name: "Invendus alimentaires (GMS)", category: "Biodéchets", ts: 0.25, vs: 0.88, bmp: 520 },
-  { id: "tontes-vegetaux", name: "Tontes & déchets verts", category: "Biodéchets", ts: 0.25, vs: 0.8, bmp: 320 },
-  { id: "graisses-flottation", name: "Graisses de flottation", category: "Agro-industrie", ts: 0.12, vs: 0.92, bmp: 850 },
-  { id: "huiles-usagees", name: "Huiles & graisses alimentaires usagées", category: "Agro-industrie", ts: 0.9, vs: 0.98, bmp: 900 },
-  { id: "dreches-brasserie", name: "Drêches de brasserie", category: "Agro-industrie", ts: 0.23, vs: 0.92, bmp: 420 },
-  { id: "marc-fruits", name: "Marc de fruits & pommes", category: "Agro-industrie", ts: 0.25, vs: 0.9, bmp: 450 },
-  { id: "lactoserum", name: "Lactosérum (petit-lait)", category: "Agro-industrie", ts: 0.06, vs: 0.9, bmp: 600 },
-  { id: "issues-cereales", name: "Issues de céréales", category: "Agro-industrie", ts: 0.88, vs: 0.95, bmp: 380 },
-  { id: "pulpes-betterave", name: "Pulpes de betterave", category: "Agro-industrie", ts: 0.22, vs: 0.95, bmp: 400 },
-  { id: "ensilage-mais", name: "Ensilage de maïs (CIVE)", category: "Cultures & CIVE", ts: 0.33, vs: 0.95, bmp: 350 },
-  { id: "cive-seigle", name: "CIVE seigle / avoine", category: "Cultures & CIVE", ts: 0.3, vs: 0.93, bmp: 320 },
-  { id: "boues-step", name: "Boues de station d'épuration", category: "Boues & co-produits", ts: 0.05, vs: 0.7, bmp: 320 },
-  { id: "boues-agro", name: "Boues agro-alimentaires", category: "Boues & co-produits", ts: 0.08, vs: 0.85, bmp: 400 },
+  { id: "epluchures", name: "Épluchures de fruits & légumes", category: "Épluchures & préparation", ts: 0.14, vs: 0.88, bmp: 460 },
+  { id: "prepa-cuisine", name: "Déchets de préparation cuisine", category: "Épluchures & préparation", ts: 0.2, vs: 0.88, bmp: 450 },
+  { id: "fruits-legumes-declasses", name: "Fruits & légumes déclassés", category: "Épluchures & préparation", ts: 0.13, vs: 0.87, bmp: 430 },
+  { id: "restes-repas", name: "Restes de repas (déchets d'assiette)", category: "Restes de repas & invendus", ts: 0.27, vs: 0.9, bmp: 500 },
+  { id: "invendus", name: "Invendus alimentaires", category: "Restes de repas & invendus", ts: 0.28, vs: 0.9, bmp: 520 },
+  { id: "pain-boulangerie", name: "Pain & produits de boulangerie", category: "Restes de repas & invendus", ts: 0.65, vs: 0.96, bmp: 520 },
+  { id: "marc-cafe", name: "Marc de café & thé", category: "Sous-produits riches", ts: 0.34, vs: 0.95, bmp: 400 },
+  { id: "produits-laitiers", name: "Produits laitiers périmés", category: "Sous-produits riches", ts: 0.16, vs: 0.9, bmp: 600 },
+  { id: "viande-poisson", name: "Restes de viande & poisson", category: "Sous-produits riches", ts: 0.35, vs: 0.92, bmp: 640 },
+  { id: "huiles-cuisson", name: "Huiles & graisses de cuisson usagées", category: "Sous-produits riches", ts: 0.9, vs: 0.98, bmp: 850 },
 ];
 
 export const SUBSTRATE_MAP: Record<string, Substrate> = Object.fromEntries(
@@ -58,26 +49,27 @@ export const SUBSTRATE_MAP: Record<string, Substrate> = Object.fromEntries(
 
 /** PCI du méthane — kWh par m³ de CH4. */
 export const PCI_CH4 = 9.94;
-/** Rendement électrique d'une cogénération biogaz. */
-const ELEC_EFFICIENCY = 0.38;
-/** Rendement thermique d'une cogénération biogaz. */
-const THERMAL_EFFICIENCY = 0.43;
-/** Rendement énergétique épuration + injection du biométhane. */
-const BIOMETHANE_YIELD = 0.92;
-/** kg de CO2 évité par kWh d'énergie fossile substituée. */
-const CO2_FACTOR = 0.22;
-/** Consommation électrique annuelle d'un foyer (kWh). */
-const HOME_ELEC_KWH = 4700;
+/** Rendement d'une chaudière biogaz (chaleur / eau chaude / cuisson). */
+const BOILER_EFFICIENCY = 0.88;
+/** Teneur en CH4 du biogaz issu de déchets alimentaires. */
+const DEFAULT_CH4_CONTENT = 0.6;
+/** Densité du biogaz — kg par m³. */
+const BIOGAS_DENSITY = 1.2;
+/**
+ * CO2 évité par tonne de déchets alimentaires traités par
+ * biométhanisation plutôt qu'incinérés (étude Bruxelles Environnement :
+ * 124 t CO2 pour 1 000 t de déchets de cuisine).
+ */
+const CO2_AVOIDED_PER_TONNE = 0.124;
 /** Consommation de chaleur annuelle d'un foyer (kWh). */
 const HOME_HEAT_KWH = 12000;
+/** Prix par défaut de la chaleur substituée (€/kWh, équivalent gaz). */
+const DEFAULT_HEAT_PRICE = 0.08;
 
-const DEFAULT_PRICES = { elec: 0.14, heat: 0.045, biomethane: 0.09 };
+/** Part de la chaleur produite réellement valorisée selon le débouché. */
+const HEAT_USE: Record<string, number> = { aucun: 0.3, partiel: 0.65, important: 0.95 };
 
-/** Part de la chaleur cogénérée réellement valorisée selon le débouché. */
-const HEAT_USE: Record<string, number> = { aucun: 0, partiel: 0.5, important: 0.9 };
-
-export type Valorization = "cogeneration" | "biomethane";
-export type EnergyOutlet = "aucun" | "partiel" | "important";
+export type HeatOutlet = "aucun" | "partiel" | "important";
 export type SupplyRegularity = "irreguliere" | "saisonniere" | "reguliere";
 
 export interface CalcLine {
@@ -87,17 +79,17 @@ export interface CalcLine {
 }
 
 export interface CalcContext {
-  valorization: Valorization;
-  /** Teneur en CH4 du biogaz (0.4-0.75). */
+  /** Teneur en CH4 du biogaz (0.5-0.7). */
   ch4Content: number;
-  energyOutlet: EnergyOutlet;
+  /** Débouché pour la chaleur sur le site (cuisine, eau chaude...). */
+  heatOutlet: HeatOutlet;
+  /** Place disponible pour installer l'unité. */
   spaceAvailable: boolean;
-  /** Coût actuel d'élimination des déchets (€/t) — incitatif au projet. */
+  /** Coût actuel d'élimination des déchets alimentaires (€/t). */
   disposalCost: number;
   supplyRegularity: SupplyRegularity;
-  elecPrice?: number;
+  /** Prix de la chaleur valorisée (€/kWh). */
   heatPrice?: number;
-  biomethanePrice?: number;
 }
 
 export interface LineResult {
@@ -128,15 +120,13 @@ export interface CalcResult {
   biogasTotal: number;
   avgBmp: number;
   primaryEnergyKwh: number;
-  valorization: Valorization;
-  electricityKwh: number;
-  heatKwh: number;
-  heatValorizedKwh: number;
-  biomethaneKwh: number;
-  valorizedEnergyKwh: number;
-  revenue: number;
-  co2Avoided: number;
+  heatUsableKwh: number;
   homesEquivalent: number;
+  digestate: number;
+  co2Avoided: number;
+  heatValue: number;
+  disposalSaving: number;
+  totalBenefit: number;
   probability: number;
   verdict: string;
   factors: ProbabilityFactor[];
@@ -147,27 +137,15 @@ const logistic = (x: number, mid: number, steep: number) =>
   1 / (1 + Math.exp(-(x - mid) / steep));
 
 function verdictFor(probability: number): string {
-  if (probability >= 70) return "Projet très favorable";
-  if (probability >= 55) return "Projet favorable";
-  if (probability >= 38) return "Projet à étudier / optimiser";
-  return "Projet peu favorable en l'état";
-}
-
-function mixScore(distinctCount: number): number {
-  if (distinctCount <= 0) return 0;
-  if (distinctCount === 1) return 0.45;
-  if (distinctCount === 2) return 0.7;
-  if (distinctCount === 3) return 0.88;
-  return 1;
+  if (probability >= 70) return "Site très favorable à une unité Waste-end";
+  if (probability >= 55) return "Site favorable";
+  if (probability >= 38) return "Site à étudier / optimiser";
+  return "Site peu adapté en l'état";
 }
 
 export function compute(lines: CalcLine[], ctx: CalcContext): CalcResult {
-  const ch4Content = clamp(ctx.ch4Content || 0.55, 0.4, 0.75);
-  const prices = {
-    elec: ctx.elecPrice ?? DEFAULT_PRICES.elec,
-    heat: ctx.heatPrice ?? DEFAULT_PRICES.heat,
-    biomethane: ctx.biomethanePrice ?? DEFAULT_PRICES.biomethane,
-  };
+  const ch4Content = clamp(ctx.ch4Content || DEFAULT_CH4_CONTENT, 0.5, 0.7);
+  const heatPrice = ctx.heatPrice ?? DEFAULT_HEAT_PRICE;
 
   const lineResults: LineResult[] = [];
   for (const line of lines) {
@@ -199,84 +177,65 @@ export function compute(lines: CalcLine[], ctx: CalcContext): CalcResult {
   const avgBmp = totalMO > 0 ? ch4Total / totalMO : 0;
   const primaryEnergyKwh = ch4Total * PCI_CH4;
 
-  let electricityKwh = 0;
-  let heatKwh = 0;
-  let heatValorizedKwh = 0;
-  let biomethaneKwh = 0;
-  let valorizedEnergyKwh = 0;
-  let homesEquivalent = 0;
-  let revenue = 0;
+  const heatUseFactor = HEAT_USE[ctx.heatOutlet] ?? 0.65;
+  const heatUsableKwh = primaryEnergyKwh * BOILER_EFFICIENCY * heatUseFactor;
+  const homesEquivalent = heatUsableKwh / HOME_HEAT_KWH;
 
-  if (ctx.valorization === "biomethane") {
-    biomethaneKwh = primaryEnergyKwh * BIOMETHANE_YIELD;
-    valorizedEnergyKwh = biomethaneKwh;
-    homesEquivalent = biomethaneKwh / HOME_HEAT_KWH;
-    revenue = biomethaneKwh * prices.biomethane;
-  } else {
-    electricityKwh = primaryEnergyKwh * ELEC_EFFICIENCY;
-    heatKwh = primaryEnergyKwh * THERMAL_EFFICIENCY;
-    heatValorizedKwh = heatKwh * (HEAT_USE[ctx.energyOutlet] ?? 0.5);
-    valorizedEnergyKwh = electricityKwh + heatValorizedKwh;
-    homesEquivalent = electricityKwh / HOME_ELEC_KWH;
-    revenue = electricityKwh * prices.elec + heatValorizedKwh * prices.heat;
-  }
+  // Le digestat correspond à la matière entrante moins la masse partie en biogaz.
+  const digestate = Math.max(0, totalTonnage - (biogasTotal * BIOGAS_DENSITY) / 1000);
+  const co2Avoided = totalTonnage * CO2_AVOIDED_PER_TONNE;
 
-  const co2Avoided = (valorizedEnergyKwh * CO2_FACTOR) / 1000;
+  const heatValue = heatUsableKwh * heatPrice;
+  const disposalSaving = totalTonnage * (Number(ctx.disposalCost) || 0);
+  const totalBenefit = heatValue + disposalSaving;
 
-  // --- Probabilité de méthanisation ---
-  const scaleScore = logistic(ch4Total, 250000, 120000);
-  const qualityScore = clamp((avgBmp - 200) / (650 - 200));
-  const mix = mixScore(lineResults.length);
-  const outletScore = { aucun: 0.2, partiel: 0.65, important: 1 }[ctx.energyOutlet] ?? 0.65;
-  const spaceScore = ctx.spaceAvailable ? 1 : 0.3;
-  const incentiveScore = clamp(ctx.disposalCost / 80);
+  // --- Score de pertinence d'une unité Waste-end ---
+  const volumeScore = logistic(totalTonnage, 120, 70);
+  const incentiveScore = clamp((Number(ctx.disposalCost) || 0) / 220);
   const regularityScore =
     { irreguliere: 0.4, saisonniere: 0.7, reguliere: 1 }[ctx.supplyRegularity] ?? 0.7;
+  const spaceScore = ctx.spaceAvailable ? 1 : 0.25;
+  const heatScore = { aucun: 0.3, partiel: 0.7, important: 1 }[ctx.heatOutlet] ?? 0.7;
+  const qualityScore = clamp((avgBmp - 380) / (640 - 380));
 
   const defs: Array<Omit<ProbabilityFactor, "contribution">> = [
     {
-      label: "Volume valorisable",
-      detail: `${Math.round(ch4Total).toLocaleString("fr-BE")} m³ CH₄/an — la taille du gisement conditionne la rentabilité`,
-      score: scaleScore,
-      weight: 0.32,
-    },
-    {
-      label: "Qualité méthanogène",
-      detail: `Potentiel moyen de ${Math.round(avgBmp)} m³ CH₄/t MO du mélange de substrats`,
-      score: qualityScore,
-      weight: 0.2,
-    },
-    {
-      label: "Co-digestion du mélange",
-      detail: `${lineResults.length} substrat(s) — un mélange équilibré stabilise la digestion`,
-      score: mix,
-      weight: 0.12,
-    },
-    {
-      label: "Débouché énergétique",
-      detail: `Valorisation de l'énergie produite (chaleur ou injection) : ${ctx.energyOutlet}`,
-      score: outletScore,
-      weight: 0.15,
-    },
-    {
-      label: "Foncier disponible",
-      detail: ctx.spaceAvailable
-        ? "Terrain disponible pour l'unité de méthanisation"
-        : "Foncier limité — contrainte d'implantation",
-      score: spaceScore,
-      weight: 0.08,
+      label: "Volume de déchets alimentaires",
+      detail: `${Math.round(totalTonnage)} t/an — un gisement suffisant justifie l'installation d'une unité`,
+      score: volumeScore,
+      weight: 0.3,
     },
     {
       label: "Incitatif économique",
-      detail: `Coût actuel d'élimination des déchets : ${ctx.disposalCost} €/t`,
+      detail: `Coût d'élimination actuel : ${Math.round(Number(ctx.disposalCost) || 0)} €/t — plus il est élevé, plus le projet est rentable`,
       score: incentiveScore,
-      weight: 0.07,
+      weight: 0.22,
     },
     {
       label: "Régularité du gisement",
-      detail: `Approvisionnement ${ctx.supplyRegularity} sur l'année`,
+      detail: `Production de déchets ${ctx.supplyRegularity} sur l'année`,
       score: regularityScore,
-      weight: 0.06,
+      weight: 0.18,
+    },
+    {
+      label: "Place disponible",
+      detail: ctx.spaceAvailable
+        ? "Espace disponible pour installer l'unité sur site"
+        : "Espace limité — contrainte d'implantation de l'unité",
+      score: spaceScore,
+      weight: 0.12,
+    },
+    {
+      label: "Débouché chaleur sur site",
+      detail: `Valorisation de la chaleur (cuisine, eau chaude) : ${ctx.heatOutlet}`,
+      score: heatScore,
+      weight: 0.1,
+    },
+    {
+      label: "Qualité méthanogène",
+      detail: `Potentiel moyen de ${Math.round(avgBmp)} m³ CH₄/t MO du mélange de déchets`,
+      score: qualityScore,
+      weight: 0.08,
     },
   ];
 
@@ -295,15 +254,13 @@ export function compute(lines: CalcLine[], ctx: CalcContext): CalcResult {
     biogasTotal,
     avgBmp,
     primaryEnergyKwh,
-    valorization: ctx.valorization,
-    electricityKwh,
-    heatKwh,
-    heatValorizedKwh,
-    biomethaneKwh,
-    valorizedEnergyKwh,
-    revenue,
-    co2Avoided,
+    heatUsableKwh,
     homesEquivalent,
+    digestate,
+    co2Avoided,
+    heatValue,
+    disposalSaving,
+    totalBenefit,
     probability,
     verdict: verdictFor(probability),
     factors,

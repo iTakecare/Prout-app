@@ -18,25 +18,20 @@ export default function AssessmentForm({
   showLabel,
   initial,
 }: Props) {
-  const [label, setLabel] = useState(initial?.label ?? "Étude de méthanisation");
+  const [label, setLabel] = useState(initial?.label ?? "Étude de faisabilité");
   const [lines, setLines] = useState<CalcLine[]>(
     initial?.lines && initial.lines.length
       ? initial.lines
       : [{ substrateId: substrates[0]?.id ?? "", tonnage: 0 }],
   );
-  const [valorization, setValorization] = useState(
-    initial?.valorization ?? "cogeneration",
-  );
   const [ch4Content, setCh4Content] = useState(
-    Math.round((initial?.ch4Content ?? 0.55) * 100),
+    Math.round((initial?.ch4Content ?? 0.6) * 100),
   );
-  const [energyOutlet, setEnergyOutlet] = useState(
-    initial?.energyOutlet ?? "partiel",
-  );
+  const [heatOutlet, setHeatOutlet] = useState(initial?.heatOutlet ?? "important");
   const [spaceAvailable, setSpaceAvailable] = useState(
     initial?.spaceAvailable ?? true,
   );
-  const [disposalCost, setDisposalCost] = useState(initial?.disposalCost ?? 0);
+  const [disposalCost, setDisposalCost] = useState(initial?.disposalCost ?? 160);
   const [supplyRegularity, setSupplyRegularity] = useState(
     initial?.supplyRegularity ?? "reguliere",
   );
@@ -57,9 +52,8 @@ export default function AssessmentForm({
   function submit() {
     onSubmit({
       label,
-      valorization,
       ch4Content: ch4Content / 100,
-      energyOutlet,
+      heatOutlet,
       spaceAvailable,
       disposalCost: Number(disposalCost) || 0,
       supplyRegularity,
@@ -76,14 +70,14 @@ export default function AssessmentForm({
         </div>
       )}
 
-      <label>Gisement de déchets organiques (tonnes brutes / an)</label>
+      <label>Gisement de déchets alimentaires (tonnes / an)</label>
       {lines.map((line, i) => (
         <div className="split-line" key={i}>
           <select
             value={line.substrateId}
             onChange={(e) => updateLine(i, { substrateId: e.target.value })}
           >
-            <option value="">— Choisir un substrat —</option>
+            <option value="">— Choisir un déchet —</option>
             {grouped.map(([cat, items]) => (
               <optgroup label={cat} key={cat}>
                 {items.map((s) => (
@@ -122,47 +116,25 @@ export default function AssessmentForm({
         }
         style={{ marginBottom: 16 }}
       >
-        + Ajouter un substrat
+        + Ajouter un déchet
       </button>
 
       <div className="form-row">
         <div className="field">
-          <label>Mode de valorisation</label>
+          <label>Débouché chaleur sur site (cuisine, eau chaude)</label>
           <select
-            value={valorization}
+            value={heatOutlet}
             onChange={(e) =>
-              setValorization(e.target.value as AssessmentInput["valorization"])
+              setHeatOutlet(e.target.value as AssessmentInput["heatOutlet"])
             }
           >
-            <option value="cogeneration">Cogénération (élec + chaleur)</option>
-            <option value="biomethane">Biométhane (injection réseau)</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Teneur en CH₄ du biogaz : {ch4Content} %</label>
-          <input
-            type="range"
-            min={45}
-            max={70}
-            value={ch4Content}
-            onChange={(e) => setCh4Content(Number(e.target.value))}
-          />
-        </div>
-        <div className="field">
-          <label>Débouché énergétique sur site</label>
-          <select
-            value={energyOutlet}
-            onChange={(e) =>
-              setEnergyOutlet(e.target.value as AssessmentInput["energyOutlet"])
-            }
-          >
-            <option value="aucun">Aucun</option>
-            <option value="partiel">Partiel</option>
             <option value="important">Important</option>
+            <option value="partiel">Partiel</option>
+            <option value="aucun">Aucun</option>
           </select>
         </div>
         <div className="field">
-          <label>Régularité de l'approvisionnement</label>
+          <label>Régularité de production des déchets</label>
           <select
             value={supplyRegularity}
             onChange={(e) =>
@@ -186,14 +158,24 @@ export default function AssessmentForm({
           />
         </div>
         <div className="field">
-          <label>Foncier disponible</label>
+          <label>Place pour installer l'unité</label>
           <select
             value={spaceAvailable ? "1" : "0"}
             onChange={(e) => setSpaceAvailable(e.target.value === "1")}
           >
             <option value="1">Oui</option>
-            <option value="0">Non / limité</option>
+            <option value="0">Non / limitée</option>
           </select>
+        </div>
+        <div className="field">
+          <label>Teneur en CH₄ du biogaz : {ch4Content} %</label>
+          <input
+            type="range"
+            min={50}
+            max={70}
+            value={ch4Content}
+            onChange={(e) => setCh4Content(Number(e.target.value))}
+          />
         </div>
       </div>
 

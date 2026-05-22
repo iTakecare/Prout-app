@@ -8,8 +8,8 @@ import Substrates from "./pages/Substrates";
 const NAV = [
   { to: "/", label: "Tableau de bord", icon: "📊", end: true },
   { to: "/pipeline", label: "Pipeline commercial", icon: "🗂️", end: false },
-  { to: "/calculateur", label: "Calculateur méthanisation", icon: "🧮", end: false },
-  { to: "/substrats", label: "Référentiel substrats", icon: "🌱", end: false },
+  { to: "/calculateur", label: "Calculateur biométhanisation", icon: "🧮", end: false },
+  { to: "/substrats", label: "Référentiel déchets", icon: "🌱", end: false },
 ];
 
 export default function App() {
@@ -35,8 +35,8 @@ export default function App() {
           </NavLink>
         ))}
         <div className="sidebar-foot">
-          Estimation du potentiel de méthanisation des déchets organiques et
-          pilotage commercial du lead à l'après-vente.
+          Estimation du potentiel de biométhanisation des déchets alimentaires
+          et pilotage commercial du lead à l'après-vente.
         </div>
       </aside>
       <main className="main">

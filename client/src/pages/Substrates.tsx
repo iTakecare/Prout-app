@@ -24,7 +24,7 @@ export default function Substrates() {
     <div>
       <div className="page-head">
         <div>
-          <h1>Référentiel des substrats</h1>
+          <h1>Référentiel des déchets alimentaires</h1>
           <p>
             Caractéristiques de référence utilisées par le moteur de calcul :
             matière sèche, matière organique et potentiel méthanogène.

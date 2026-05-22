@@ -35,8 +35,8 @@ export default function Dashboard() {
         <div>
           <h1>Tableau de bord</h1>
           <p>
-            Vue d'ensemble du pipeline de vente de solutions de méthanisation
-            Waste-end.
+            Vue d'ensemble du pipeline de vente de solutions de
+            biométhanisation Waste-end.
           </p>
         </div>
         <Link to="/pipeline" className="btn">

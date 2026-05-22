@@ -41,15 +41,13 @@ export interface CalcResult {
   biogasTotal: number;
   avgBmp: number;
   primaryEnergyKwh: number;
-  valorization: "cogeneration" | "biomethane";
-  electricityKwh: number;
-  heatKwh: number;
-  heatValorizedKwh: number;
-  biomethaneKwh: number;
-  valorizedEnergyKwh: number;
-  revenue: number;
-  co2Avoided: number;
+  heatUsableKwh: number;
   homesEquivalent: number;
+  digestate: number;
+  co2Avoided: number;
+  heatValue: number;
+  disposalSaving: number;
+  totalBenefit: number;
   probability: number;
   verdict: string;
   factors: ProbabilityFactor[];
@@ -61,9 +59,8 @@ export interface CalcLine {
 }
 
 export interface AssessmentInput extends Record<string, unknown> {
-  valorization: "cogeneration" | "biomethane";
   ch4Content: number;
-  energyOutlet: "aucun" | "partiel" | "important";
+  heatOutlet: "aucun" | "partiel" | "important";
   spaceAvailable: boolean;
   disposalCost: number;
   supplyRegularity: "irreguliere" | "saisonniere" | "reguliere";

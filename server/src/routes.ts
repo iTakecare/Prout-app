@@ -5,7 +5,6 @@ import {
   SUBSTRATES,
   type CalcContext,
   type CalcLine,
-  type Valorization,
 } from "./calc.js";
 
 const router = Router();
@@ -23,14 +22,11 @@ function wrap(
 }
 
 function buildContext(body: Record<string, unknown>): CalcContext {
-  const valorization: Valorization =
-    body.valorization === "biomethane" ? "biomethane" : "cogeneration";
   return {
-    valorization,
-    ch4Content: Number(body.ch4Content) || 0.55,
-    energyOutlet: (["aucun", "partiel", "important"].includes(String(body.energyOutlet))
-      ? body.energyOutlet
-      : "partiel") as CalcContext["energyOutlet"],
+    ch4Content: Number(body.ch4Content) || 0.6,
+    heatOutlet: (["aucun", "partiel", "important"].includes(String(body.heatOutlet))
+      ? body.heatOutlet
+      : "important") as CalcContext["heatOutlet"],
     spaceAvailable: body.spaceAvailable !== false && body.spaceAvailable !== 0,
     disposalCost: Number(body.disposalCost) || 0,
     supplyRegularity: (["irreguliere", "saisonniere", "reguliere"].includes(
@@ -38,9 +34,7 @@ function buildContext(body: Record<string, unknown>): CalcContext {
     )
       ? body.supplyRegularity
       : "reguliere") as CalcContext["supplyRegularity"],
-    elecPrice: body.elecPrice != null ? Number(body.elecPrice) : undefined,
     heatPrice: body.heatPrice != null ? Number(body.heatPrice) : undefined,
-    biomethanePrice: body.biomethanePrice != null ? Number(body.biomethanePrice) : undefined,
   };
 }
 
@@ -247,7 +241,7 @@ router.post(
       [
         id,
         label,
-        ctx.valorization,
+        "thermique",
         JSON.stringify({ ...ctx, lines }),
         JSON.stringify(result),
         result.probability,

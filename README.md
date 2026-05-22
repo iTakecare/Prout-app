@@ -1,21 +1,27 @@
-# Méthascore — Méthanisation & CRM Waste-end
+# Méthascore — Biométhanisation & CRM Waste-end
 
-Application full-stack pour **estimer la probabilité de méthanisation** de
-gisements de déchets organiques et **piloter le cycle commercial** de la vente
-de solutions [Waste-end](https://www.waste-end.com), du lead entrant à la
-gestion après-vente.
+Application full-stack pour **estimer le potentiel d'une unité de
+biométhanisation de déchets alimentaires** sur site et **piloter le cycle
+commercial** de la vente de solutions [Waste-end](https://www.waste-end.com),
+du lead entrant à la gestion après-vente.
+
+Cible : petits et moyens producteurs de déchets alimentaires — restaurants,
+écoles, maisons de repos, hôpitaux, cuisines de collectivité — qui traitent
+leurs déchets sur place au lieu de les faire collecter et incinérer.
 
 ## Ce que fait l'application
 
-1. **Moteur de calcul de méthanisation** — à partir d'un gisement de déchets
-   organiques (tonnages annuels par substrat), estime :
+1. **Moteur de calcul de biométhanisation** — à partir du gisement de déchets
+   alimentaires d'un établissement (tonnages annuels par type de déchet),
+   estime :
    - la production de méthane (CH₄) et de biogaz,
-   - l'énergie primaire, l'électricité / chaleur (cogénération) ou le
-     biométhane injecté,
-   - la recette énergétique annuelle et le CO₂ évité,
-   - une **probabilité de faisabilité** (0-100 %) avec le détail des facteurs
-     (taille du gisement, qualité méthanogène, co-digestion, débouché
-     énergétique, foncier, incitatif économique, régularité).
+   - la chaleur valorisable sur site (cuisine, eau chaude),
+   - le digestat (engrais naturel) produit,
+   - le CO₂ évité par rapport à l'incinération,
+   - les économies annuelles (collecte évitée + énergie),
+   - un **score de pertinence** (0-100 %) du projet, avec le détail des
+     facteurs (volume de déchets, incitatif économique, régularité, place
+     disponible, débouché chaleur, qualité méthanogène).
 
 2. **CRM avec pipeline commercial** — chaque prospect (lead) avance dans un
    pipeline : Nouveau lead → Qualifié → Étude technique → Proposition →
@@ -67,21 +73,25 @@ GitHub Actions. Voir **[DEPLOY.md](./DEPLOY.md)** pour la procédure complète
 
 | Méthode | Route | Rôle |
 |--------|-------|------|
-| `GET` | `/api/meta` | Référentiel substrats + étapes du pipeline |
-| `POST` | `/api/calc` | Calcul de méthanisation sans persistance |
+| `GET` | `/api/meta` | Référentiel des déchets + étapes du pipeline |
+| `POST` | `/api/calc` | Calcul de biométhanisation sans persistance |
 | `GET/POST` | `/api/leads` | Liste / création de leads |
 | `GET/PUT/DELETE` | `/api/leads/:id` | Détail / mise à jour / suppression |
 | `PATCH` | `/api/leads/:id/stage` | Changement d'étape du pipeline |
-| `POST` | `/api/leads/:id/assessments` | Étude de méthanisation rattachée |
+| `POST` | `/api/leads/:id/assessments` | Étude de faisabilité rattachée |
 | `POST` | `/api/leads/:id/activities` | Journal des interactions |
 | `POST` | `/api/leads/:id/tickets` | Tickets de suivi / SAV |
 | `GET` | `/api/dashboard` | Indicateurs agrégés du pipeline |
 
 ## Modèle de calcul
 
-Par substrat : `CH₄ = tonnage × MS × MO × potentiel méthanogène`.
+Par type de déchet : `CH₄ = tonnage × MS × MO × potentiel méthanogène`.
 
-Les caractéristiques de référence des substrats (matière sèche, matière
-organique, potentiel méthanogène) sont des ordres de grandeur issus de la
-littérature technique. Elles sont centralisées dans `server/src/calc.ts` et
-peuvent être affinées par substrat.
+Puis : biogaz, énergie primaire (PCI du CH₄), chaleur valorisable (rendement
+chaudière × débouché sur site), digestat, CO₂ évité vs incinération (0,124 t
+CO₂ par tonne de déchets, étude Bruxelles Environnement) et économies.
+
+Les caractéristiques de référence des déchets alimentaires (matière sèche,
+matière organique, potentiel méthanogène) sont des ordres de grandeur issus de
+la littérature technique sur la digestion anaérobie des biodéchets. Elles sont
+centralisées dans `server/src/calc.ts` et peuvent être affinées.

@@ -18,10 +18,10 @@ export default function Calculator() {
     <div>
       <div className="page-head">
         <div>
-          <h1>Calculateur de méthanisation</h1>
+          <h1>Calculateur de biométhanisation</h1>
           <p>
-            Estimez le potentiel biogaz et la probabilité de faisabilité d'un
-            projet à partir d'un gisement de déchets organiques.
+            Estimez le potentiel d'une unité Waste-end à partir du gisement de
+            déchets alimentaires d'un établissement.
           </p>
         </div>
       </div>
@@ -30,7 +30,9 @@ export default function Calculator() {
 
       <div className="cols-2">
         <div className="card">
-          <h3 style={{ fontSize: 15, marginBottom: 14 }}>Données du gisement</h3>
+          <h3 style={{ fontSize: 15, marginBottom: 14 }}>
+            Déchets alimentaires de l'établissement
+          </h3>
           {substrates.length > 0 && (
             <AssessmentForm
               substrates={substrates}
@@ -55,8 +57,8 @@ export default function Calculator() {
             <ResultView result={result} />
           ) : (
             <div className="card empty">
-              Renseignez les substrats et lancez le calcul pour afficher la
-              probabilité de méthanisation et la valorisation estimée.
+              Renseignez les déchets alimentaires et lancez le calcul pour
+              afficher la pertinence du projet et les bénéfices estimés.
             </div>
           )}
         </div>

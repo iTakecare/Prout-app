@@ -282,7 +282,7 @@ function SyntheseTab({
         {lead.assessments[0] && (
           <div className="card">
             <h3 style={{ fontSize: 14, marginBottom: 10 }}>
-              Dernière étude méthanisation
+              Dernière étude de faisabilité
             </h3>
             <ResultView result={lead.assessments[0].result} />
           </div>
@@ -310,7 +310,7 @@ function EtudesTab({
     <div className="stack">
       <div className="card">
         <div className="row-between">
-          <h3 style={{ fontSize: 15 }}>Nouvelle étude de méthanisation</h3>
+          <h3 style={{ fontSize: 15 }}>Nouvelle étude de faisabilité</h3>
           <button className="btn ghost sm" onClick={() => setShowForm((s) => !s)}>
             {showForm ? "Masquer" : "Afficher"}
           </button>
@@ -338,10 +338,7 @@ function EtudesTab({
             <div>
               <h3 style={{ fontSize: 15 }}>{a.label}</h3>
               <span className="muted" style={{ fontSize: 12 }}>
-                {fmtDate(a.createdAt)} ·{" "}
-                {a.valorization === "biomethane"
-                  ? "Biométhane"
-                  : "Cogénération"}
+                {fmtDate(a.createdAt)} · Biométhanisation
               </span>
             </div>
             <button
