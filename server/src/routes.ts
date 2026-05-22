@@ -2,12 +2,31 @@ import { Router, type Request, type Response } from "express";
 import pool, { STAGE_IDS, STAGE_WIN, STAGES } from "./db.js";
 import {
   compute,
-  SUBSTRATES,
   type CalcContext,
   type CalcLine,
+  type Substrate,
 } from "./calc.js";
 
 const router = Router();
+
+async function getSubstrates(): Promise<Substrate[]> {
+  const { rows } = await pool.query(
+    "SELECT id, name, category, ts, vs, bmp FROM substrates ORDER BY position, name",
+  );
+  return rows as Substrate[];
+}
+
+function slugify(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "substrat"
+  );
+}
 
 /** Enveloppe les handlers async pour router les erreurs vers Express. */
 function wrap(
@@ -101,16 +120,102 @@ async function leadDetail(id: number) {
   return { ...lead, assessments, activities, tickets };
 }
 
-/** Référentiel des substrats et des étapes du pipeline. */
-router.get("/meta", (_req, res) => {
-  res.json({ substrates: SUBSTRATES, stages: STAGES });
-});
+/** Référentiel des déchets et des étapes du pipeline. */
+router.get(
+  "/meta",
+  wrap(async (_req, res) => {
+    res.json({ substrates: await getSubstrates(), stages: STAGES });
+  }),
+);
 
-/** Calcul de méthanisation sans persistance (calculateur libre). */
-router.post("/calc", (req, res) => {
-  const result = compute(buildLines(req.body?.lines), buildContext(req.body ?? {}));
-  res.json(result);
-});
+/** Calcul de biométhanisation sans persistance (calculateur libre). */
+router.post(
+  "/calc",
+  wrap(async (req, res) => {
+    const substrates = await getSubstrates();
+    const result = compute(
+      buildLines(req.body?.lines),
+      buildContext(req.body ?? {}),
+      substrates,
+    );
+    res.json(result);
+  }),
+);
+
+/** Référentiel des déchets — opérations d'édition. */
+router.get(
+  "/substrates",
+  wrap(async (_req, res) => {
+    res.json(await getSubstrates());
+  }),
+);
+
+router.post(
+  "/substrates",
+  wrap(async (req, res) => {
+    const b = req.body ?? {};
+    const name = String(b.name ?? "").trim();
+    if (!name) return res.status(400).json({ error: "Le nom est requis" });
+    let id = slugify(name);
+    const exists = await pool.query("SELECT 1 FROM substrates WHERE id = $1", [id]);
+    if ((exists.rowCount ?? 0) > 0) id = `${id}-${Date.now().toString(36)}`;
+    const pos = await pool.query<{ m: number }>(
+      "SELECT COALESCE(MAX(position), 0) + 1 AS m FROM substrates",
+    );
+    await pool.query(
+      `INSERT INTO substrates (id, name, category, ts, vs, bmp, position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        id,
+        name,
+        String(b.category || "Autres déchets"),
+        Math.min(1, Math.max(0, Number(b.ts) || 0)),
+        Math.min(1, Math.max(0, Number(b.vs) || 0)),
+        Math.max(0, Number(b.bmp) || 0),
+        pos.rows[0].m,
+      ],
+    );
+    res.status(201).json(await getSubstrates());
+  }),
+);
+
+router.put(
+  "/substrates/:id",
+  wrap(async (req, res) => {
+    const b = req.body ?? {};
+    const current = await pool.query("SELECT * FROM substrates WHERE id = $1", [
+      req.params.id,
+    ]);
+    if (current.rowCount === 0)
+      return res.status(404).json({ error: "Déchet introuvable" });
+    const c = current.rows[0];
+    await pool.query(
+      `UPDATE substrates SET name = $1, category = $2, ts = $3, vs = $4, bmp = $5
+       WHERE id = $6`,
+      [
+        b.name != null ? String(b.name) : c.name,
+        b.category != null ? String(b.category) : c.category,
+        b.ts != null ? Math.min(1, Math.max(0, Number(b.ts))) : c.ts,
+        b.vs != null ? Math.min(1, Math.max(0, Number(b.vs))) : c.vs,
+        b.bmp != null ? Math.max(0, Number(b.bmp)) : c.bmp,
+        req.params.id,
+      ],
+    );
+    res.json(await getSubstrates());
+  }),
+);
+
+router.delete(
+  "/substrates/:id",
+  wrap(async (req, res) => {
+    const del = await pool.query("DELETE FROM substrates WHERE id = $1", [
+      req.params.id,
+    ]);
+    if (del.rowCount === 0)
+      return res.status(404).json({ error: "Déchet introuvable" });
+    res.json(await getSubstrates());
+  }),
+);
 
 /** Liste des leads, filtrable par étape, avec la probabilité de la dernière étude. */
 router.get(
@@ -233,7 +338,7 @@ router.post(
     if (lead.rowCount === 0) return res.status(404).json({ error: "Lead introuvable" });
     const ctx = buildContext(req.body ?? {});
     const lines = buildLines(req.body?.lines);
-    const result = compute(lines, ctx);
+    const result = compute(lines, ctx, await getSubstrates());
     const label = String(req.body?.label || "Étude de méthanisation");
     await pool.query(
       `INSERT INTO assessments (lead_id, label, valorization, inputs_json, result_json, probability)
@@ -253,6 +358,31 @@ router.post(
     );
     await pool.query("UPDATE leads SET updated_at = now() WHERE id = $1", [id]);
     res.status(201).json(await leadDetail(id));
+  }),
+);
+
+/** Détail d'une étude avec le lead associé (pour la proposition PDF). */
+router.get(
+  "/assessments/:id",
+  wrap(async (req, res) => {
+    const a = await pool.query("SELECT * FROM assessments WHERE id = $1", [
+      Number(req.params.id),
+    ]);
+    if (a.rowCount === 0)
+      return res.status(404).json({ error: "Étude introuvable" });
+    const row = a.rows[0];
+    const lead = await pool.query("SELECT * FROM leads WHERE id = $1", [
+      row.lead_id,
+    ]);
+    res.json({
+      id: row.id,
+      label: row.label,
+      probability: row.probability,
+      createdAt: row.created_at,
+      inputs: row.inputs_json,
+      result: row.result_json,
+      lead: lead.rows[0] ?? null,
+    });
   }),
 );
 

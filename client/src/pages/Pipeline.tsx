@@ -50,7 +50,7 @@ function NewLeadModal({
         <h2 style={{ fontSize: 18, marginBottom: 14 }}>Nouveau lead</h2>
         {error && <div className="error-box">{error}</div>}
         <div className="field">
-          <label>Entreprise *</label>
+          <label>Établissement *</label>
           <input value={form.company} onChange={(e) => set("company", e.target.value)} />
         </div>
         <div className="form-row">
@@ -62,7 +62,7 @@ function NewLeadModal({
             />
           </div>
           <div className="field">
-            <label>Secteur d'activité</label>
+            <label>Secteur</label>
             <input value={form.sector} onChange={(e) => set("sector", e.target.value)} />
           </div>
           <div className="field">
@@ -117,6 +117,8 @@ export default function Pipeline() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   function load() {
     Promise.all([api.leads(), api.meta()])
@@ -138,8 +140,23 @@ export default function Pipeline() {
   }
 
   async function setStage(lead: Lead, stage: string) {
+    if (lead.stage === stage) return;
     await api.setStage(lead.id, stage);
     load();
+  }
+
+  function clearDrag() {
+    setDragId(null);
+    setDragOver(null);
+  }
+
+  async function handleDrop(stageId: string) {
+    const lead = leads.find((l) => l.id === dragId);
+    clearDrag();
+    if (lead && lead.stage !== stageId) {
+      await api.setStage(lead.id, stageId);
+      load();
+    }
   }
 
   if (error) return <div className="error-box">{error}</div>;
@@ -149,7 +166,10 @@ export default function Pipeline() {
       <div className="page-head">
         <div>
           <h1>Pipeline commercial</h1>
-          <p>Du lead entrant à la gestion après-vente des installations.</p>
+          <p>
+            Du lead entrant à la gestion après-vente. Glissez-déposez une fiche
+            d'une colonne à l'autre pour faire avancer l'affaire.
+          </p>
         </div>
         <button className="btn" onClick={() => setShowModal(true)}>
           + Nouveau lead
@@ -159,14 +179,36 @@ export default function Pipeline() {
       <div className="kanban">
         {stages.map((stage) => {
           const items = leads.filter((l) => l.stage === stage.id);
+          const isTarget = dragOver === stage.id && dragId != null;
           return (
-            <div className="kanban-col" key={stage.id}>
+            <div
+              className={"kanban-col" + (isTarget ? " drop-target" : "")}
+              key={stage.id}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragOver !== stage.id) setDragOver(stage.id);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node))
+                  setDragOver((c) => (c === stage.id ? null : c));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(stage.id);
+              }}
+            >
               <h3>
                 {stage.label}
                 <span className="count">{items.length}</span>
               </h3>
               {items.map((lead) => (
-                <div className="lead-card" key={lead.id}>
+                <div
+                  className={"lead-card" + (dragId === lead.id ? " dragging" : "")}
+                  key={lead.id}
+                  draggable
+                  onDragStart={() => setDragId(lead.id)}
+                  onDragEnd={clearDrag}
+                >
                   <Link to={`/leads/${lead.id}`} className="company">
                     {lead.company}
                   </Link>
@@ -202,9 +244,7 @@ export default function Pipeline() {
                         </button>
                         <button
                           onClick={() => move(lead, 1)}
-                          disabled={
-                            HAPPY.indexOf(lead.stage) >= HAPPY.length - 1
-                          }
+                          disabled={HAPPY.indexOf(lead.stage) >= HAPPY.length - 1}
                         >
                           ▶
                         </button>
@@ -217,8 +257,8 @@ export default function Pipeline() {
                 </div>
               ))}
               {items.length === 0 && (
-                <div className="muted" style={{ fontSize: 12, padding: "6px 4px" }}>
-                  Aucun lead
+                <div className="muted" style={{ fontSize: 12, padding: "8px 5px" }}>
+                  {isTarget ? "Déposer ici" : "Aucun lead"}
                 </div>
               )}
             </div>

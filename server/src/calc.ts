@@ -30,7 +30,7 @@ export interface Substrate {
   bmp: number;
 }
 
-export const SUBSTRATES: Substrate[] = [
+export const DEFAULT_SUBSTRATES: Substrate[] = [
   { id: "epluchures", name: "Épluchures de fruits & légumes", category: "Épluchures & préparation", ts: 0.14, vs: 0.88, bmp: 460 },
   { id: "prepa-cuisine", name: "Déchets de préparation cuisine", category: "Épluchures & préparation", ts: 0.2, vs: 0.88, bmp: 450 },
   { id: "fruits-legumes-declasses", name: "Fruits & légumes déclassés", category: "Épluchures & préparation", ts: 0.13, vs: 0.87, bmp: 430 },
@@ -42,10 +42,6 @@ export const SUBSTRATES: Substrate[] = [
   { id: "viande-poisson", name: "Restes de viande & poisson", category: "Sous-produits riches", ts: 0.35, vs: 0.92, bmp: 640 },
   { id: "huiles-cuisson", name: "Huiles & graisses de cuisson usagées", category: "Sous-produits riches", ts: 0.9, vs: 0.98, bmp: 850 },
 ];
-
-export const SUBSTRATE_MAP: Record<string, Substrate> = Object.fromEntries(
-  SUBSTRATES.map((s) => [s.id, s]),
-);
 
 /** PCI du méthane — kWh par m³ de CH4. */
 export const PCI_CH4 = 9.94;
@@ -143,13 +139,20 @@ function verdictFor(probability: number): string {
   return "Site peu adapté en l'état";
 }
 
-export function compute(lines: CalcLine[], ctx: CalcContext): CalcResult {
+export function compute(
+  lines: CalcLine[],
+  ctx: CalcContext,
+  substrates: Substrate[] = DEFAULT_SUBSTRATES,
+): CalcResult {
   const ch4Content = clamp(ctx.ch4Content || DEFAULT_CH4_CONTENT, 0.5, 0.7);
   const heatPrice = ctx.heatPrice ?? DEFAULT_HEAT_PRICE;
+  const substrateMap: Record<string, Substrate> = Object.fromEntries(
+    substrates.map((s) => [s.id, s]),
+  );
 
   const lineResults: LineResult[] = [];
   for (const line of lines) {
-    const s = SUBSTRATE_MAP[line.substrateId];
+    const s = substrateMap[line.substrateId];
     const tonnage = Number(line.tonnage) || 0;
     if (!s || tonnage <= 0) continue;
     const tMS = tonnage * s.ts;

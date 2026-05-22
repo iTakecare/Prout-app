@@ -1,5 +1,10 @@
 import pg from "pg";
-import { compute, type CalcContext, type CalcLine } from "./calc.js";
+import {
+  compute,
+  DEFAULT_SUBSTRATES,
+  type CalcContext,
+  type CalcLine,
+} from "./calc.js";
 
 const { Pool } = pg;
 
@@ -76,10 +81,35 @@ CREATE TABLE IF NOT EXISTS tickets (
   resolved_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS substrates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  ts DOUBLE PRECISION NOT NULL,
+  vs DOUBLE PRECISION NOT NULL,
+  bmp DOUBLE PRECISION NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_assessments_lead ON assessments(lead_id);
 CREATE INDEX IF NOT EXISTS idx_activities_lead ON activities(lead_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_lead ON tickets(lead_id);
 `;
+
+async function seedSubstrates(): Promise<void> {
+  const { rows } = await pool.query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM substrates",
+  );
+  if (rows[0].n > 0) return;
+  let position = 0;
+  for (const s of DEFAULT_SUBSTRATES) {
+    await pool.query(
+      `INSERT INTO substrates (id, name, category, ts, vs, bmp, position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [s.id, s.name, s.category, s.ts, s.vs, s.bmp, position++],
+    );
+  }
+}
 
 type Demo = {
   lead: {
@@ -368,7 +398,7 @@ async function seed(): Promise<void> {
 
       if (demo.assessment) {
         const { label, ctx, lines } = demo.assessment;
-        const result = compute(lines, ctx);
+        const result = compute(lines, ctx, DEFAULT_SUBSTRATES);
         await client.query(
           `INSERT INTO assessments (lead_id, label, valorization, inputs_json, result_json, probability)
            VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -409,6 +439,7 @@ async function seed(): Promise<void> {
 /** Crée le schéma et, si la base est vide, charge un jeu de démonstration. */
 export async function initDb(): Promise<void> {
   await pool.query(SCHEMA);
+  await seedSubstrates();
   await seed();
 }
 

@@ -1,4 +1,5 @@
 import type {
+  Assessment,
   AssessmentInput,
   CalcResult,
   Dashboard,
@@ -66,4 +67,19 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+  assessment: (id: number) =>
+    request<Assessment & { lead: Lead | null }>(`/api/assessments/${id}`),
+  substrates: () => request<Substrate[]>("/api/substrates"),
+  createSubstrate: (data: Partial<Substrate>) =>
+    request<Substrate[]>("/api/substrates", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateSubstrate: (id: string, data: Partial<Substrate>) =>
+    request<Substrate[]>(`/api/substrates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deleteSubstrate: (id: string) =>
+    request<Substrate[]>(`/api/substrates/${id}`, { method: "DELETE" }),
 };

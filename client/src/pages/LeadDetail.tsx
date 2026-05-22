@@ -341,13 +341,18 @@ function EtudesTab({
                 {fmtDate(a.createdAt)} · Biométhanisation
               </span>
             </div>
-            <button
-              className="btn danger sm"
-              disabled={busy}
-              onClick={() => onChange(() => api.deleteAssessment(a.id))}
-            >
-              Supprimer
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <Link className="btn sm" to={`/proposition/${a.id}`} target="_blank">
+                Proposition PDF
+              </Link>
+              <button
+                className="btn danger sm"
+                disabled={busy}
+                onClick={() => onChange(() => api.deleteAssessment(a.id))}
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
           <ResultView result={a.result} />
         </div>
