@@ -9,23 +9,53 @@ const GAUGE_COLORS: Record<string, string> = {
 };
 
 export function ProbabilityGauge({ result }: { result: CalcResult }) {
-  const cls = probaClass(result.probability);
+  const color = GAUGE_COLORS[probaClass(result.probability)];
+  const R = 48;
+  const C = 2 * Math.PI * R;
+  const offset = C * (1 - Math.max(0, Math.min(100, result.probability)) / 100);
   return (
     <div className="gauge">
-      <div
-        className="gauge-ring"
-        style={
-          {
-            "--p": result.probability,
-            "--gc": GAUGE_COLORS[cls],
-          } as React.CSSProperties
-        }
+      <svg
+        width="122"
+        height="122"
+        viewBox="0 0 122 122"
+        style={{ flexShrink: 0 }}
       >
-        <div className="inner">
-          <div className="pct">{result.probability}%</div>
-          <div className="cap">Pertinence</div>
-        </div>
-      </div>
+        <circle cx="61" cy="61" r={R} fill="none" stroke="#eaeeec" strokeWidth="13" />
+        <circle
+          cx="61"
+          cy="61"
+          r={R}
+          fill="none"
+          stroke={color}
+          strokeWidth="13"
+          strokeLinecap="round"
+          strokeDasharray={C}
+          strokeDashoffset={offset}
+          transform="rotate(-90 61 61)"
+        />
+        <text
+          x="61"
+          y="59"
+          textAnchor="middle"
+          fontSize="27"
+          fontWeight="800"
+          fill="#14201b"
+        >
+          {result.probability}%
+        </text>
+        <text
+          x="61"
+          y="77"
+          textAnchor="middle"
+          fontSize="9"
+          fontWeight="700"
+          fill="#687a71"
+          letterSpacing="0.8"
+        >
+          PERTINENCE
+        </text>
+      </svg>
       <div>
         <h3 style={{ fontSize: 16 }}>{result.verdict}</h3>
         <p className="muted" style={{ margin: "4px 0 0", maxWidth: 280 }}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { LogoFull } from "../components/Logo";
@@ -127,6 +127,8 @@ export default function Proposition() {
   const { assessmentId } = useParams();
   const [data, setData] = useState<(Assessment & { lead: Lead | null }) | null>(null);
   const [error, setError] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const docRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api
@@ -154,18 +156,55 @@ export default function Proposition() {
   const lead = data.lead;
   const company = lead?.company ?? "Établissement";
 
+  async function downloadPdf() {
+    const el = docRef.current;
+    if (!el) return;
+    setPdfBusy(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      const img = canvas.toDataURL("image/jpeg", 0.95);
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`Proposition Waste-end - ${company}.pdf`);
+    } catch {
+      alert("La génération du PDF a échoué. Veuillez réessayer.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   return (
     <div className="doc-screen">
       <div className="doc-toolbar">
         <Link to={lead ? `/leads/${lead.id}` : "/"} className="btn ghost">
           ← Retour
         </Link>
-        <button className="btn" onClick={() => window.print()}>
-          ⤓ Télécharger en PDF
+        <button className="btn" onClick={downloadPdf} disabled={pdfBusy}>
+          {pdfBusy ? "Génération du PDF…" : "⤓ Télécharger le PDF"}
         </button>
       </div>
 
-      <div className="doc">
+      <div className="doc" ref={docRef}>
         <div className="doc-hero">
           <div
             style={{
