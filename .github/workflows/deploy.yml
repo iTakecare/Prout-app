@@ -1,23 +1,20 @@
 name: Déploiement VPS
 
+# Déploiement de l'application sur le VPS, derrière le reverse proxy Traefik.
+# L'image est construite sur GitHub puis transférée prête à l'emploi : le VPS
+# se contente de la charger et de démarrer les conteneurs.
+
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  pull-requests: write
-
 env:
   VPS_HOST: "76.13.0.189"
   VPS_USER: root
   DEPLOY_DIR: /opt/ITCmdm/deploy/prout-app
-  SSH_OPTS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30"
 
 jobs:
   deploy:
@@ -26,52 +23,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # L'image est construite ici, sur l'infrastructure GitHub (rapide).
       - name: Build de l'image Docker
         run: docker build -t prout-app:latest .
 
       - name: Export de l'image
         run: docker save prout-app:latest | gzip > prout-app-image.tar.gz
 
-      - name: Installer sshpass
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-
       - name: Transfert vers le VPS
-        env:
-          SSHPASS: ${{ secrets.VPS_PASSWORD }}
-        run: |
-          echo "===== TRANSFERT DES FICHIERS =====" >> vps-report.txt
-          if sshpass -e ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "mkdir -p $DEPLOY_DIR && echo 'Connexion OK'" >> vps-report.txt 2>&1; then
-            sshpass -e scp $SSH_OPTS prout-app-image.tar.gz docker-compose.yml \
-              "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/" >> vps-report.txt 2>&1 \
-              && echo "Transfert de l'image : OK" >> vps-report.txt \
-              || echo "ECHEC: transfert de l'image" >> vps-report.txt
-          else
-            echo "ECHEC: connexion SSH au VPS" >> vps-report.txt
-          fi
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "prout-app-image.tar.gz,docker-compose.yml"
+          target: ${{ env.DEPLOY_DIR }}
 
-      - name: Diagnostic et déploiement sur le VPS
-        env:
-          SSHPASS: ${{ secrets.VPS_PASSWORD }}
-        run: |
-          echo "===== EXÉCUTION DU DÉPLOIEMENT =====" >> vps-report.txt
-          sshpass -e ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" 'bash -s' < scripts/vps-deploy.sh \
-            >> vps-report.txt 2>&1 \
-            || echo "(le script de déploiement s'est terminé en erreur)" >> vps-report.txt
-          echo "----- RAPPORT COMPLET -----"
-          cat vps-report.txt
-
-      - name: Publier le rapport sur la PR
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          [ -f vps-report.txt ] || echo "(aucun rapport généré)" > vps-report.txt
-          {
-            echo "## Rapport de déploiement VPS — run ${{ github.run_id }}"
-            echo
-            echo '```'
-            tail -c 60000 vps-report.txt
-            echo '```'
-          } > comment.md
-          gh pr comment 1 --body-file comment.md --repo "${{ github.repository }}" || true
+      - name: Démarrage de l'application
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd "${{ env.DEPLOY_DIR }}"
+            docker load -i prout-app-image.tar.gz
+            rm -f prout-app-image.tar.gz
+            [ -f .postgres_password ] || openssl rand -hex 24 > .postgres_password
+            PROXY_NETWORK=$(docker network ls --format '{{.Name}}' | grep -Ei 'web|proxy|traefik' | head -1)
+            cat > .env <<EOF
+            APP_DOMAIN=prout-app.vibecodestudio.io
+            POSTGRES_USER=prout
+            POSTGRES_DB=prout
+            POSTGRES_PASSWORD=$(cat .postgres_password)
+            PROXY_NETWORK=${PROXY_NETWORK:-web}
+            CERT_RESOLVER=le
+            HTTPS_ENTRYPOINT=websecure
+            EOF
+            chmod 600 .env
+            docker compose up -d --no-build --remove-orphans
+            docker compose ps
