@@ -1,8 +1,8 @@
 name: Déploiement VPS
 
-# Déploiement de l'application sur le VPS, derrière le reverse proxy Traefik.
-# L'image est construite sur GitHub puis transférée prête à l'emploi : le VPS
-# se contente de la charger et de démarrer les conteneurs.
+# Construit l'image sur GitHub, la transfère sur le VPS et démarre
+# l'application derrière le reverse proxy Traefik. Le résultat est publié
+# en commentaire de la PR #1 pour le suivi du déploiement.
 
 on:
   workflow_dispatch:
@@ -13,10 +13,15 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   VPS_HOST: "76.13.0.189"
   VPS_USER: root
   DEPLOY_DIR: /opt/ITCmdm/deploy/prout-app
+  SSH_OPTS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30"
 
 jobs:
   deploy:
@@ -31,38 +36,40 @@ jobs:
       - name: Export de l'image
         run: docker save prout-app:latest | gzip > prout-app-image.tar.gz
 
-      - name: Transfert vers le VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "prout-app-image.tar.gz,docker-compose.yml"
-          target: ${{ env.DEPLOY_DIR }}
+      - name: Installer sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
-      - name: Démarrage de l'application
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 20m
-          script: |
-            set -e
-            cd "${{ env.DEPLOY_DIR }}"
-            docker load -i prout-app-image.tar.gz
-            rm -f prout-app-image.tar.gz
-            [ -f .postgres_password ] || openssl rand -hex 24 > .postgres_password
-            PROXY_NETWORK=$(docker network ls --format '{{.Name}}' | grep -Ei 'web|proxy|traefik' | head -1)
-            cat > .env <<EOF
-            APP_DOMAIN=prout-app.vibecodestudio.io
-            POSTGRES_USER=prout
-            POSTGRES_DB=prout
-            POSTGRES_PASSWORD=$(cat .postgres_password)
-            PROXY_NETWORK=${PROXY_NETWORK:-web}
-            CERT_RESOLVER=le
-            HTTPS_ENTRYPOINT=websecure
-            EOF
-            chmod 600 .env
-            docker compose up -d --no-build --remove-orphans
-            docker compose ps
+      - name: Déploiement sur le VPS
+        id: deploy
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          T="$VPS_USER@$VPS_HOST"
+          {
+            echo "### Transfert de l'image vers le VPS"
+            sshpass -e ssh $SSH_OPTS "$T" "mkdir -p $DEPLOY_DIR"
+            sshpass -e scp $SSH_OPTS prout-app-image.tar.gz docker-compose.yml "$T:$DEPLOY_DIR/"
+            echo "### Démarrage de l'application"
+            sshpass -e ssh $SSH_OPTS "$T" 'bash -s' < scripts/start-on-vps.sh
+          } 2>&1 | tee deploy-log.txt
+
+      - name: Publier le résultat sur la PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f deploy-log.txt ] || echo "(déploiement non démarré)" > deploy-log.txt
+          {
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "## ✅ Déploiement réussi — run ${{ github.run_id }}"
+              echo
+              echo "Application en ligne : https://prout-app.vibecodestudio.io"
+            else
+              echo "## ❌ Déploiement en échec — run ${{ github.run_id }}"
+            fi
+            echo
+            echo '```'
+            tail -c 55000 deploy-log.txt
+            echo '```'
+          } > comment.md
+          gh pr comment 1 --body-file comment.md --repo "${{ github.repository }}" || true
