@@ -165,26 +165,69 @@ export default function Proposition() {
         import("html2canvas"),
         import("jspdf"),
       ]);
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-      });
+      const opts = { scale: 2, backgroundColor: "#ffffff", useCORS: true };
+      const shoot = async (node: Element) => {
+        const c = await html2canvas(node as HTMLElement, opts);
+        return { data: c.toDataURL("image/jpeg", 0.92), ratio: c.height / c.width };
+      };
+
       const pdf = new jsPDF("p", "mm", "a4");
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
-      const img = canvas.toDataURL("image/jpeg", 0.95);
-      let heightLeft = imgH;
-      let position = 0;
-      pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position -= pageH;
-        pdf.addPage();
-        pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
-        heightLeft -= pageH;
+      const PW = pdf.internal.pageSize.getWidth();
+      const PH = pdf.internal.pageSize.getHeight();
+      const M = 11; // marge haut / bas
+      const SIDE = 13; // marge latérale du corps
+      const GAP = 5; // espace entre blocs
+      const bodyW = PW - 2 * SIDE;
+      const usable = PH - 2 * M;
+      let y = 0;
+      let firstOnPage = true;
+
+      // En-tête — pleine largeur, en haut de la 1re page.
+      const hero = el.querySelector(".doc-hero");
+      if (hero) {
+        const { data, ratio } = await shoot(hero);
+        const h = PW * ratio;
+        pdf.addImage(data, "JPEG", 0, 0, PW, h);
+        y = h;
+        firstOnPage = false;
       }
+
+      // Sections — un bloc par section, jamais coupé en deux.
+      const sections = Array.from(el.querySelectorAll(".doc-body > .doc-section"));
+      for (const sec of sections) {
+        const { data, ratio } = await shoot(sec);
+        let w = bodyW;
+        let h = w * ratio;
+        if (h > usable) {
+          h = usable;
+          w = h / ratio;
+        }
+        const top = firstOnPage ? M : y + GAP;
+        if (top + h > PH - M) {
+          pdf.addPage();
+          y = M;
+        } else {
+          y = top;
+        }
+        pdf.addImage(data, "JPEG", SIDE + (bodyW - w) / 2, y, w, h);
+        y += h;
+        firstOnPage = false;
+      }
+
+      // Pied de page — pleine largeur.
+      const foot = el.querySelector(".doc-foot");
+      if (foot) {
+        const { data, ratio } = await shoot(foot);
+        const h = PW * ratio;
+        if (y + GAP + h > PH) {
+          pdf.addPage();
+          y = 0;
+        } else {
+          y += GAP;
+        }
+        pdf.addImage(data, "JPEG", 0, y, PW, h);
+      }
+
       pdf.save(`Proposition Waste-end - ${company}.pdf`);
     } catch {
       alert("La génération du PDF a échoué. Veuillez réessayer.");

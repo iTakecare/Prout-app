@@ -141,8 +141,6 @@ h3 {
 .main {
   flex: 1;
   padding: 32px clamp(24px, 3vw, 56px) 80px;
-  max-width: 1800px;
-  margin: 0 auto;
   width: 100%;
   min-width: 0;
 }
@@ -437,7 +435,7 @@ th.num {
 }
 
 .kanban-col {
-  min-width: 256px;
+  min-width: 210px;
   flex: 1;
   background: #ecefed;
   border-radius: var(--radius);
