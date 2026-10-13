@@ -985,3 +985,29 @@ th.num {
   font-weight: 700;
   margin: 14px 0 7px;
 }
+
+/* ---------- Référentiel des déchets (tableau éditable) ---------- */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.substrate-table {
+  min-width: 860px;
+}
+
+.substrate-table td {
+  padding: 7px 6px;
+}
+
+.substrate-table .col-name input {
+  min-width: 230px;
+}
+
+.substrate-table .col-cat select {
+  min-width: 190px;
+}
+
+.substrate-table td.num input {
+  width: 84px;
+  text-align: right;
+}

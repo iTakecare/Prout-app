@@ -48,10 +48,10 @@ function SubstrateRow({
 
   return (
     <tr>
-      <td>
+      <td className="col-name">
         <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
       </td>
-      <td>
+      <td className="col-cat">
         <select
           value={f.category}
           onChange={(e) => setF({ ...f, category: e.target.value })}
@@ -247,31 +247,33 @@ export default function Substrates() {
         {categories.map((cat) => (
           <div className="card" key={cat}>
             <h3 style={{ fontSize: 14, marginBottom: 8 }}>{cat}</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Déchet</th>
-                  <th>Catégorie</th>
-                  <th className="num">MS %</th>
-                  <th className="num">MO % MS</th>
-                  <th className="num">CH₄ m³/t MO</th>
-                  <th className="num">CH₄/t brute</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {substrates
-                  .filter((s) => s.category === cat)
-                  .map((s) => (
-                    <SubstrateRow
-                      key={s.id}
-                      s={s}
-                      onChange={load}
-                      onError={setError}
-                    />
-                  ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="substrate-table">
+                <thead>
+                  <tr>
+                    <th>Déchet</th>
+                    <th>Catégorie</th>
+                    <th className="num">MS %</th>
+                    <th className="num">MO % MS</th>
+                    <th className="num">CH₄ m³/t MO</th>
+                    <th className="num">CH₄/t brute</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {substrates
+                    .filter((s) => s.category === cat)
+                    .map((s) => (
+                      <SubstrateRow
+                        key={s.id}
+                        s={s}
+                        onChange={load}
+                        onError={setError}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
         {substrates.length === 0 && (
