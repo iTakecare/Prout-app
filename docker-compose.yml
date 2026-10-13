@@ -2,7 +2,6 @@ name: prout-app
 
 services:
   app:
-    build: .
     image: prout-app:latest
     container_name: prout-app
     restart: unless-stopped
